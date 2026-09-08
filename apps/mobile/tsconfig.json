@@ -1,0 +1,12 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "baseUrl": "../..",
+    "rootDir": "../..",
+    "paths": {
+      "@locapay/shared-types": ["packages/shared-types/src/index.ts"]
+    }
+  },
+  "include": ["App.tsx", "src"]
+}

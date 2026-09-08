@@ -1,0 +1,188 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN_RH
+  RESPONSABLE_RH
+  TUTEUR
+  STAGIAIRE
+}
+
+enum StageType {
+  OBLIGATOIRE
+  INITIATION
+  PROFESSIONNEL
+}
+
+enum StageStatus {
+  EN_COURS
+  TERMINE
+  ANNULE
+}
+
+enum ActivityCategory {
+  DEVELOPPEMENT
+  REUNION
+  FORMATION
+  RECHERCHE
+  DOCUMENTATION
+  AUTRE
+}
+
+enum ActivityStatus {
+  BROUILLON
+  SOUMISE
+  VALIDEE
+  REJETEE
+}
+
+enum ReportType {
+  MENSUEL
+  FINAL
+}
+
+enum ReportStatus {
+  BROUILLON
+  GENERE
+  SIGNE
+}
+
+enum NotificationType {
+  INFO
+  ACTIVITY_SUBMITTED
+  ACTIVITY_VALIDATED
+  REPORT_GENERATED
+  STAGE_ENDING
+}
+
+model User {
+  id                 String         @id @default(cuid())
+  email              String         @unique
+  password           String
+  firstName          String
+  lastName           String
+  role               UserRole
+  isActive           Boolean        @default(true)
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  stagiaireProfile   Stagiaire?     @relation("StagiaireUser")
+  tutoredStagiaires  Stagiaire[]    @relation("TutorStagiaires")
+  evaluations        Evaluation[]   @relation("Evaluator")
+  notifications      Notification[]
+  documents          Document[]
+}
+
+model Stagiaire {
+  id             String            @id @default(cuid())
+  userId         String            @unique
+  tutorId        String
+  school         String
+  fieldOfStudy   String
+  level          String
+  startDate      DateTime
+  endDate        DateTime
+  typeStage      StageType
+  subject        String
+  service        String
+  status         StageStatus       @default(EN_COURS)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  user           User              @relation("StagiaireUser", fields: [userId], references: [id])
+  tutor          User              @relation("TutorStagiaires", fields: [tutorId], references: [id])
+  activities     Activity[]
+  evaluations    Evaluation[]
+  reports        Report[]
+  skills         StagiaireSkill[]
+  documents      Document[]
+}
+
+model Activity {
+  id              String           @id @default(cuid())
+  stagiaireId     String
+  date            DateTime
+  category        ActivityCategory
+  description     String
+  durationMinutes Int
+  status          ActivityStatus   @default(SOUMISE)
+  tutorComment    String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  stagiaire       Stagiaire        @relation(fields: [stagiaireId], references: [id], onDelete: Cascade)
+}
+
+model Evaluation {
+  id                 String     @id @default(cuid())
+  stagiaireId         String
+  evaluatorId         String
+  technicalScore      Int
+  communicationScore  Int
+  autonomyScore       Int
+  punctualityScore    Int
+  comment             String
+  createdAt           DateTime   @default(now())
+  stagiaire           Stagiaire  @relation(fields: [stagiaireId], references: [id], onDelete: Cascade)
+  evaluator           User       @relation("Evaluator", fields: [evaluatorId], references: [id])
+}
+
+model Report {
+  id           String       @id @default(cuid())
+  stagiaireId  String
+  type         ReportType
+  status       ReportStatus @default(BROUILLON)
+  title        String
+  html         String?
+  pdfUrl       String?
+  generatedAt  DateTime?
+  signedAt     DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  stagiaire    Stagiaire    @relation(fields: [stagiaireId], references: [id], onDelete: Cascade)
+}
+
+model Skill {
+  id          String           @id @default(cuid())
+  name        String           @unique
+  category    String
+  stagiaires  StagiaireSkill[]
+}
+
+model StagiaireSkill {
+  id           String     @id @default(cuid())
+  stagiaireId  String
+  skillId      String
+  level        Int
+  validatedAt  DateTime?
+  stagiaire    Stagiaire  @relation(fields: [stagiaireId], references: [id], onDelete: Cascade)
+  skill        Skill      @relation(fields: [skillId], references: [id])
+
+  @@unique([stagiaireId, skillId])
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  message   String
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Document {
+  id           String     @id @default(cuid())
+  stagiaireId  String
+  ownerId      String
+  name         String
+  url          String
+  mimeType     String
+  createdAt    DateTime   @default(now())
+  stagiaire    Stagiaire  @relation(fields: [stagiaireId], references: [id], onDelete: Cascade)
+  owner        User       @relation(fields: [ownerId], references: [id])
+}

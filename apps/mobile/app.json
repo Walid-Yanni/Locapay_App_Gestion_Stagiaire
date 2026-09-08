@@ -1,0 +1,18 @@
+{
+  "expo": {
+    "name": "LOCAPAY Stagiaires",
+    "slug": "locapay-stagiaires",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "locapaystagiaires",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0f5b45"
+      }
+    }
+  }
+}
