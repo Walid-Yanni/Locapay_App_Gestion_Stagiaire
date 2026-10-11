@@ -1,8 +1,18 @@
 import { prisma } from "../lib/prisma.js";
+import { HttpError } from "../lib/http-error.js";
+import type { UserRole } from "@locapay/shared-types";
 
-export async function listActivities(stagiaireId?: string) {
+type Requester = { sub: string; role: UserRole };
+
+export async function listActivities(stagiaireId: string | undefined, requester: Requester) {
+  // Les stagiaires voient uniquement leurs activités et les tuteurs celles de leurs stagiaires.
+  const scope = requester.role === "STAGIAIRE"
+    ? { stagiaire: { userId: requester.sub } }
+    : requester.role === "TUTEUR"
+      ? { stagiaire: { tutorId: requester.sub } }
+      : {};
   return prisma.activity.findMany({
-    where: { stagiaireId },
+    where: { ...(stagiaireId ? { stagiaireId } : {}), ...scope },
     include: { stagiaire: { include: { user: true } } },
     orderBy: { date: "desc" },
   });
@@ -14,7 +24,17 @@ export async function createActivity(input: {
   category: "DEVELOPPEMENT" | "REUNION" | "FORMATION" | "RECHERCHE" | "DOCUMENTATION" | "AUTRE";
   description: string;
   durationMinutes: number;
-}) {
+}, requester: Requester) {
+  // Un stagiaire ne peut créer une activité que pour son propre profil.
+  if (requester.role === "STAGIAIRE") {
+    const profile = await prisma.stagiaire.findUnique({ where: { userId: requester.sub } });
+    if (!profile) throw new HttpError(403, "Profil stagiaire introuvable");
+    if (input.stagiaireId !== profile.id) throw new HttpError(403, "Vous ne pouvez créer une activité que pour votre profil");
+  }
+  if (requester.role === "TUTEUR") {
+    const profile = await prisma.stagiaire.findFirst({ where: { id: input.stagiaireId, tutorId: requester.sub } });
+    if (!profile) throw new HttpError(403, "Ce stagiaire ne vous est pas attribué");
+  }
   const activity = await prisma.activity.create({
     data: {
       ...input,
@@ -36,7 +56,12 @@ export async function createActivity(input: {
   return activity;
 }
 
-export async function reviewActivity(id: string, input: { status: "VALIDEE" | "REJETEE"; tutorComment?: string }) {
+export async function reviewActivity(id: string, input: { status: "VALIDEE" | "REJETEE"; tutorComment?: string }, requester: Requester) {
+  // La revue d'un tuteur est limitée aux activités de ses stagiaires.
+  if (requester.role === "TUTEUR") {
+    const activity = await prisma.activity.findFirst({ where: { id, stagiaire: { tutorId: requester.sub } } });
+    if (!activity) throw new HttpError(403, "Cette activité n'appartient pas à un de vos stagiaires");
+  }
   const activity = await prisma.activity.update({
     where: { id },
     data: input,

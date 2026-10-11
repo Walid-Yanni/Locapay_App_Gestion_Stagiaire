@@ -11,12 +11,12 @@ export async function login(email: string, password: string) {
 
   const accessToken = jwt.sign(
     { sub: user.id, role: user.role },
-    process.env.JWT_SECRET ?? "dev-secret",
+    process.env.JWT_SECRET!,
     { expiresIn: "1h" },
   );
   const refreshToken = jwt.sign(
     { sub: user.id },
-    process.env.JWT_REFRESH_SECRET ?? "dev-refresh-secret",
+    process.env.JWT_REFRESH_SECRET!,
     { expiresIn: "30d" },
   );
 

@@ -64,6 +64,9 @@ export interface Report {
   title: string;
   generatedAt?: string | null;
   signedAt?: string | null;
+  signedByTutor: boolean;
+  signedByRH: boolean;
+  signedByStagiaire: boolean;
   pdfUrl?: string | null;
 }
 

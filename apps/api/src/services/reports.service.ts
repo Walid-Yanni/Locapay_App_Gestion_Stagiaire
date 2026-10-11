@@ -1,5 +1,9 @@
 import puppeteer from "puppeteer";
 import { prisma } from "../lib/prisma.js";
+import { HttpError } from "../lib/http-error.js";
+import type { UserRole } from "@locapay/shared-types";
+
+type Requester = { sub: string; role: UserRole };
 
 export async function generateReportPdf(html: string): Promise<Buffer> {
   const browser = await puppeteer.launch({
@@ -20,12 +24,14 @@ export async function generateReportPdf(html: string): Promise<Buffer> {
   }
 }
 
-export async function getReportPdf(id: string): Promise<{ filename: string; buffer: Buffer }> {
+export async function getReportPdf(id: string, requester: Requester): Promise<{ filename: string; buffer: Buffer }> {
   const report = await prisma.report.findUnique({
     where: { id },
     include: { stagiaire: { include: { user: true } } },
   });
   if (!report || !report.html) throw new Error("Rapport introuvable ou contenu absent");
+  if (requester.role === "STAGIAIRE" && report.stagiaire.userId !== requester.sub) throw new HttpError(403, "Ce rapport ne vous appartient pas");
+  if (requester.role === "TUTEUR" && report.stagiaire.tutorId !== requester.sub) throw new HttpError(403, "Ce rapport n'appartient pas à un de vos stagiaires");
   const buffer = await generateReportPdf(report.html);
   return {
     filename: `rapport-${report.stagiaire.user.lastName.toLowerCase()}-${report.id.slice(0, 8)}.pdf`,
@@ -33,15 +39,26 @@ export async function getReportPdf(id: string): Promise<{ filename: string; buff
   };
 }
 
-export async function listReports(stagiaireId?: string) {
+export async function listReports(stagiaireId: string | undefined, requester: Requester) {
+  // Les rapports sont toujours bornés au profil du stagiaire ou aux stagiaires du tuteur.
+  const scope = requester.role === "STAGIAIRE"
+    ? { stagiaire: { userId: requester.sub } }
+    : requester.role === "TUTEUR"
+      ? { stagiaire: { tutorId: requester.sub } }
+      : {};
   return prisma.report.findMany({
-    where: { stagiaireId },
+    where: { ...(stagiaireId ? { stagiaireId } : {}), ...scope },
     include: { stagiaire: { include: { user: true, tutor: true } } },
     orderBy: { createdAt: "desc" },
   });
 }
 
-export async function generateFinalReport(stagiaireId: string) {
+export async function generateFinalReport(stagiaireId: string, requester?: Requester) {
+  // La génération déclenchée par un tuteur reste limitée à ses stagiaires.
+  if (requester?.role === "TUTEUR") {
+    const profile = await prisma.stagiaire.findFirst({ where: { id: stagiaireId, tutorId: requester.sub } });
+    if (!profile) throw new HttpError(403, "Ce stagiaire ne vous est pas attribué");
+  }
   const existing = await prisma.report.findFirst({
     where: { stagiaireId, type: "FINAL" },
   });
@@ -98,9 +115,23 @@ export async function generateFinalReport(stagiaireId: string) {
   return report;
 }
 
-export async function signReport(id: string) {
+export async function signReport(id: string, requester: Requester) {
+  // Chaque rôle ne peut modifier que son propre indicateur de signature.
+  const report = await prisma.report.findUnique({ where: { id }, include: { stagiaire: true } });
+  if (!report) throw new HttpError(404, "Rapport introuvable");
+  if (requester.role === "STAGIAIRE" && report.stagiaire.userId !== requester.sub) throw new HttpError(403, "Ce rapport ne vous appartient pas");
+  if (requester.role === "TUTEUR" && report.stagiaire.tutorId !== requester.sub) throw new HttpError(403, "Ce rapport n'appartient pas à un de vos stagiaires");
+
+  const signature = requester.role === "STAGIAIRE"
+    ? { signedByStagiaire: true }
+    : requester.role === "TUTEUR"
+      ? { signedByTutor: true }
+      : { signedByRH: true };
+  const allSigned = (report.signedByTutor || requester.role === "TUTEUR")
+    && (report.signedByRH || requester.role === "ADMIN_RH" || requester.role === "RESPONSABLE_RH")
+    && (report.signedByStagiaire || requester.role === "STAGIAIRE");
   return prisma.report.update({
     where: { id },
-    data: { status: "SIGNE", signedAt: new Date() },
+    data: { ...signature, status: allSigned ? "SIGNE" : "GENERE", signedAt: allSigned ? new Date() : null },
   });
 }

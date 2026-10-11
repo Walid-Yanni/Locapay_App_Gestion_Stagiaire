@@ -1,12 +1,22 @@
 import bcrypt from "bcrypt";
+import { randomBytes } from "node:crypto";
 import { prisma } from "../lib/prisma.js";
+import type { UserRole } from "@locapay/shared-types";
 
-export async function listStagiaires(filters: { status?: string; service?: string; tutorId?: string }) {
+type Requester = { sub: string; role: UserRole };
+
+export async function listStagiaires(filters: { status?: string; service?: string; tutorId?: string }, requester: Requester) {
+  // La portée est imposée par l'identité ; tutorId reste un filtre réservé aux RH.
+  const scope = requester.role === "STAGIAIRE"
+    ? { userId: requester.sub }
+    : requester.role === "TUTEUR"
+      ? { tutorId: requester.sub }
+      : { tutorId: filters.tutorId };
   return prisma.stagiaire.findMany({
     where: {
       status: filters.status as never,
       service: filters.service,
-      tutorId: filters.tutorId,
+      ...scope,
     },
     include: {
       user: { select: { id: true, email: true, firstName: true, lastName: true, role: true, isActive: true } },
@@ -19,9 +29,15 @@ export async function listStagiaires(filters: { status?: string; service?: strin
   });
 }
 
-export async function getStagiaire(id: string) {
+export async function getStagiaire(id: string, requester: Requester) {
+  // Un détail de stagiaire est accessible seulement dans la portée de l'appelant.
+  const scope = requester.role === "STAGIAIRE"
+    ? { userId: requester.sub }
+    : requester.role === "TUTEUR"
+      ? { tutorId: requester.sub }
+      : {};
   return prisma.stagiaire.findUnique({
-    where: { id },
+    where: { id, ...scope },
     include: {
       user: { select: { id: true, email: true, firstName: true, lastName: true, role: true, isActive: true } },
       tutor: { select: { id: true, email: true, firstName: true, lastName: true, role: true, isActive: true } },
@@ -38,7 +54,6 @@ export async function createStagiaire(input: {
   email: string;
   firstName: string;
   lastName: string;
-  password: string;
   tutorId: string;
   school: string;
   fieldOfStudy: string;
@@ -48,9 +63,10 @@ export async function createStagiaire(input: {
   typeStage: "OBLIGATOIRE" | "INITIATION" | "PROFESSIONNEL";
   subject: string;
   service: string;
-}) {
-  const password = await bcrypt.hash(input.password, 10);
-  return prisma.stagiaire.create({
+}, _requester: Requester) {
+  const temporaryPassword = randomBytes(9).toString("base64url");
+  const password = await bcrypt.hash(temporaryPassword, 10);
+  const stagiaire = await prisma.stagiaire.create({
     data: {
       user: {
         create: {
@@ -59,6 +75,7 @@ export async function createStagiaire(input: {
           lastName: input.lastName,
           password,
           role: "STAGIAIRE",
+          mustChangePassword: true,
         },
       },
       tutor: { connect: { id: input.tutorId } },
@@ -71,6 +88,10 @@ export async function createStagiaire(input: {
       subject: input.subject,
       service: input.service,
     },
-    include: { user: true, tutor: true },
+    include: {
+      user: { select: { id: true, email: true, firstName: true, lastName: true, role: true, isActive: true, mustChangePassword: true } },
+      tutor: true,
+    },
   });
+  return { stagiaire, temporaryPassword };
 }

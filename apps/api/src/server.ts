@@ -10,6 +10,7 @@ import reportsRouter from "./routes/reports.routes.js";
 import stagiairesRouter from "./routes/stagiaires.routes.js";
 import { scheduleEndOfCycleReports } from "./jobs/endOfCycleReports.job.js";
 import { swaggerSpec, swaggerUi } from "./lib/swagger.js";
+import { errorHandler } from "./lib/http-error.js";
 
 const app = express();
 const port = Number(process.env.PORT ?? 4000);
@@ -41,6 +42,13 @@ app.use("/api/notifications", notificationsRouter);
 app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 scheduleEndOfCycleReports();
+
+if (!process.env.JWT_SECRET || !process.env.JWT_REFRESH_SECRET) {
+  console.error("JWT_SECRET et JWT_REFRESH_SECRET sont obligatoires et doivent être des chaînes longues et aléatoires.");
+  process.exit(1);
+}
+
+app.use(errorHandler);
 
 app.listen(port, () => {
   console.log(`API LOCAPAY demarree sur http://localhost:${port}`);

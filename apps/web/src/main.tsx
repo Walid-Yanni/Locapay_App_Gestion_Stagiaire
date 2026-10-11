@@ -225,7 +225,6 @@ function StagiairesView({
     typeStage: "PROFESSIONNEL" as "PROFESSIONNEL" | "OBLIGATOIRE" | "INITIATION",
     subject: "",
     service: "Ingénierie logicielle",
-    password: "Locapay2026!",
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -244,12 +243,13 @@ function StagiairesView({
     setSaving(true);
     setError("");
     try {
-      await api("/api/stagiaires", {
+      const result = await api<{ temporaryPassword: string }>("/api/stagiaires", {
         method: "POST",
         body: JSON.stringify(form),
       });
       setShowModal(false);
       reload();
+      window.alert(`Compte créé. Mot de passe temporaire : ${result.temporaryPassword}\n\nTransmettez-le au stagiaire maintenant : il ne sera plus jamais affiché.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur création stagiaire");
     } finally {
@@ -808,10 +808,12 @@ function ReportsView({
   reports,
   stagiaires,
   reload,
+  role,
 }: {
   reports: Report[];
   stagiaires: Stagiaire[];
   reload: () => void;
+  role: UserRole;
 }) {
   const [generating, setGenerating] = useState(false);
   const [downloading, setDownloading] = useState<string | null>(null);
@@ -876,13 +878,24 @@ function ReportsView({
           },
           {
             header: "Statut",
-            render: (item) => <Badge value={item.status} />,
+            render: (item) => (
+              <div className="stack" style={{ gap: "4px" }}>
+                <Badge value={item.status} />
+                <small>Tuteur: {item.signedByTutor ? "Signé" : "En attente"}</small>
+                <small>RH: {item.signedByRH ? "Signé" : "En attente"}</small>
+                <small>Stagiaire: {item.signedByStagiaire ? "Signé" : "En attente"}</small>
+              </div>
+            ),
           },
           {
             header: "Actions",
             render: (item) => (
               <div className="actions-cell">
-                {item.status !== "SIGNE" && (
+                {item.status !== "SIGNE" && !(
+                  (role === "TUTEUR" && item.signedByTutor) ||
+                  (role === "STAGIAIRE" && item.signedByStagiaire) ||
+                  ((role === "ADMIN_RH" || role === "RESPONSABLE_RH") && item.signedByRH)
+                ) && (
                   <button
                     className="btn-sm secondary-button"
                     title="Signer électroniquement"
@@ -1063,6 +1076,7 @@ function App() {
               reports={reports.data}
               stagiaires={stagiaires.data}
               reload={reports.reload}
+              role={role}
             />
           )}
           {view === "notifications" && (
