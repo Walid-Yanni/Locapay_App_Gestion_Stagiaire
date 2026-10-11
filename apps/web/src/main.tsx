@@ -992,6 +992,31 @@ function App() {
         }
       : null,
   );
+  function handleLogout() {
+    localStorage.clear();
+    setSession(null);
+  }
+
+  if (!session) {
+    return <LoginScreen onSession={setSession} />;
+  }
+
+  if (session.user.mustChangePassword) {
+    return (
+      <ChangePasswordScreen
+        user={session.user}
+        onDone={(user) => setSession({ ...session, user })}
+        onLogout={handleLogout}
+      />
+    );
+  }
+
+  // Monté seulement avec une session valide : les données se chargent à la connexion
+  // (ou à la fin du changement de mot de passe) et sont détruites à la déconnexion.
+  return <Workspace key={session.user.id} session={session} onLogout={handleLogout} />;
+}
+
+function Workspace({ session, onLogout }: { session: Session; onLogout: () => void }) {
   const [view, setView] = useState("dashboard");
 
   const stagiaires = useApiResource<Stagiaire[]>("/api/stagiaires", []);
@@ -1012,25 +1037,6 @@ function App() {
     reports.loading &&
     notifications.loading;
 
-  function handleLogout() {
-    localStorage.clear();
-    setSession(null);
-  }
-
-  if (!session) {
-    return <LoginScreen onSession={setSession} />;
-  }
-
-  if (session.user.mustChangePassword) {
-    return (
-      <ChangePasswordScreen
-        user={session.user}
-        onDone={(user) => setSession({ ...session, user })}
-        onLogout={handleLogout}
-      />
-    );
-  }
-
   const role = session.user.role as UserRole;
   const canManageStagiaires = role === "ADMIN_RH" || role === "RESPONSABLE_RH";
   const canEvaluate = role === "TUTEUR" || role === "ADMIN_RH" || role === "RESPONSABLE_RH";
@@ -1044,7 +1050,7 @@ function App() {
       }}
       view={view}
       onView={setView}
-      onLogout={handleLogout}
+      onLogout={onLogout}
       unreadCount={unreadNotificationsCount}
     >
       {loading ? (
