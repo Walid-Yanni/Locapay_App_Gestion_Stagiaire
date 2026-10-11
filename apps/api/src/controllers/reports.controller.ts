@@ -1,5 +1,6 @@
 import type { Response } from "express";
 import type { AuthenticatedRequest } from "../middlewares/auth.middleware.js";
+import { HttpError } from "../lib/http-error.js";
 import { generateFinalReport, getReportPdf, listReports, signReport } from "../services/reports.service.js";
 
 export async function getReports(req: AuthenticatedRequest, res: Response) {
@@ -22,7 +23,12 @@ export async function getReportPdfController(req: AuthenticatedRequest, res: Res
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     res.send(buffer);
   } catch (error) {
-    res.status(404).json({ message: error instanceof Error ? error.message : "Erreur generation PDF" });
+    if (error instanceof HttpError) {
+      res.status(error.statusCode).json({ message: error.message });
+      return;
+    }
+    console.error(error);
+    res.status(500).json({ message: "Erreur generation PDF" });
   }
 }
 

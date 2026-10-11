@@ -29,7 +29,7 @@ export async function getReportPdf(id: string, requester: Requester): Promise<{ 
     where: { id },
     include: { stagiaire: { include: { user: true } } },
   });
-  if (!report || !report.html) throw new Error("Rapport introuvable ou contenu absent");
+  if (!report || !report.html) throw new HttpError(404, "Rapport introuvable ou contenu absent");
   if (requester.role === "STAGIAIRE" && report.stagiaire.userId !== requester.sub) throw new HttpError(403, "Ce rapport ne vous appartient pas");
   if (requester.role === "TUTEUR" && report.stagiaire.tutorId !== requester.sub) throw new HttpError(403, "Ce rapport n'appartient pas à un de vos stagiaires");
   const buffer = await generateReportPdf(report.html);
@@ -117,21 +117,24 @@ export async function generateFinalReport(stagiaireId: string, requester?: Reque
 
 export async function signReport(id: string, requester: Requester) {
   // Chaque rôle ne peut modifier que son propre indicateur de signature.
-  const report = await prisma.report.findUnique({ where: { id }, include: { stagiaire: true } });
-  if (!report) throw new HttpError(404, "Rapport introuvable");
-  if (requester.role === "STAGIAIRE" && report.stagiaire.userId !== requester.sub) throw new HttpError(403, "Ce rapport ne vous appartient pas");
-  if (requester.role === "TUTEUR" && report.stagiaire.tutorId !== requester.sub) throw new HttpError(403, "Ce rapport n'appartient pas à un de vos stagiaires");
+  return prisma.$transaction(async (tx) => {
+    const report = await tx.report.findUnique({ where: { id }, include: { stagiaire: true } });
+    if (!report) throw new HttpError(404, "Rapport introuvable");
+    if (requester.role === "STAGIAIRE" && report.stagiaire.userId !== requester.sub) throw new HttpError(403, "Ce rapport ne vous appartient pas");
+    if (requester.role === "TUTEUR" && report.stagiaire.tutorId !== requester.sub) throw new HttpError(403, "Ce rapport n'appartient pas à un de vos stagiaires");
 
-  const signature = requester.role === "STAGIAIRE"
-    ? { signedByStagiaire: true }
-    : requester.role === "TUTEUR"
-      ? { signedByTutor: true }
-      : { signedByRH: true };
-  const allSigned = (report.signedByTutor || requester.role === "TUTEUR")
-    && (report.signedByRH || requester.role === "ADMIN_RH" || requester.role === "RESPONSABLE_RH")
-    && (report.signedByStagiaire || requester.role === "STAGIAIRE");
-  return prisma.report.update({
-    where: { id },
-    data: { ...signature, status: allSigned ? "SIGNE" : "GENERE", signedAt: allSigned ? new Date() : null },
+    const signature = requester.role === "STAGIAIRE"
+      ? { signedByStagiaire: true }
+      : requester.role === "TUTEUR"
+        ? { signedByTutor: true }
+        : { signedByRH: true };
+    // L'UPDATE verrouille la ligne : une signature concurrente attend le commit,
+    // puis relit les indicateurs à jour. Aucune signature ne peut en écraser une autre.
+    const signed = await tx.report.update({ where: { id }, data: signature });
+    const allSigned = signed.signedByTutor && signed.signedByRH && signed.signedByStagiaire;
+    return tx.report.update({
+      where: { id },
+      data: { status: allSigned ? "SIGNE" : "GENERE", signedAt: allSigned ? (signed.signedAt ?? new Date()) : null },
+    });
   });
 }

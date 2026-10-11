@@ -12,6 +12,16 @@ import { scheduleEndOfCycleReports } from "./jobs/endOfCycleReports.job.js";
 import { swaggerSpec, swaggerUi } from "./lib/swagger.js";
 import { errorHandler } from "./lib/http-error.js";
 
+// Refus de démarrer sans secrets JWT robustes, avant toute initialisation (cron compris).
+const MIN_SECRET_LENGTH = 32;
+for (const name of ["JWT_SECRET", "JWT_REFRESH_SECRET"] as const) {
+  const value = process.env[name];
+  if (!value || value.length < MIN_SECRET_LENGTH) {
+    console.error(`${name} est absent ou trop court (minimum ${MIN_SECRET_LENGTH} caractères). Démarrage de l'API refusé.`);
+    process.exit(1);
+  }
+}
+
 const app = express();
 const port = Number(process.env.PORT ?? 4000);
 
@@ -42,11 +52,6 @@ app.use("/api/notifications", notificationsRouter);
 app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 scheduleEndOfCycleReports();
-
-if (!process.env.JWT_SECRET || !process.env.JWT_REFRESH_SECRET) {
-  console.error("JWT_SECRET et JWT_REFRESH_SECRET sont obligatoires et doivent être des chaînes longues et aléatoires.");
-  process.exit(1);
-}
 
 app.use(errorHandler);
 
