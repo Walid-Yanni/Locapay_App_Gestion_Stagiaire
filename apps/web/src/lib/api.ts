@@ -9,6 +9,7 @@ export interface Session {
     firstName: string;
     lastName: string;
     role: string;
+    mustChangePassword?: boolean;
   };
 }
 
@@ -39,6 +40,13 @@ export async function login(email: string, password: string) {
   localStorage.setItem("accessToken", session.accessToken);
   localStorage.setItem("user", JSON.stringify(session.user));
   return session;
+}
+
+export async function changePassword(currentPassword: string, newPassword: string) {
+  return api<{ message: string }>("/api/auth/change-password", {
+    method: "POST",
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
 }
 
 export async function downloadReportPdf(reportId: string, filename: string) {

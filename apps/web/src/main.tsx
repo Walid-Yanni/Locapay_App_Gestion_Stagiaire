@@ -25,6 +25,7 @@ import { KpiCard } from "./components/KpiCard";
 import { Shell } from "./components/Shell";
 import { useApiResource } from "./hooks/useApiResource";
 import { api, downloadReportPdf, login, type Session } from "./lib/api";
+import { ChangePasswordScreen } from "./pages/ChangePasswordScreen";
 import "./styles.css";
 
 const demoAccounts: [string, string, UserRole][] = [
@@ -1018,6 +1019,16 @@ function App() {
 
   if (!session) {
     return <LoginScreen onSession={setSession} />;
+  }
+
+  if (session.user.mustChangePassword) {
+    return (
+      <ChangePasswordScreen
+        user={session.user}
+        onDone={(user) => setSession({ ...session, user })}
+        onLogout={handleLogout}
+      />
+    );
   }
 
   const role = session.user.role as UserRole;
