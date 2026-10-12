@@ -86,5 +86,13 @@ else
   check "création du stagiaire de test par la RH" "échec" "mot de passe temporaire reçu"
 fi
 
+echo; echo "5. Liste des tuteurs (réservée aux RH)"
+check "GET /api/users/tutors sans authentification" "$(code "$BASE/api/users/tutors")" "401"
+check "GET /api/users/tutors par un tuteur" "$(code "$BASE/api/users/tutors" -H "Authorization: Bearer $T_TU")" "403"
+check "GET /api/users/tutors par un stagiaire" "$(code "$BASE/api/users/tutors" -H "Authorization: Bearer $T_ST")" "403"
+check "GET /api/users/tutors par la RH" "$(code "$BASE/api/users/tutors" -H "Authorization: Bearer $T_RH")" "200"
+CHAMPS=$(get "$T_RH" /api/users/tutors | python3 -c "import sys,json;d=json.load(sys.stdin);print('oui' if d and all(set(t)=={'id','firstName','lastName'} for t in d) else 'non')" 2>/dev/null)
+check "réponse limitée à id, prénom, nom (ni mot de passe ni e-mail)" "$CHAMPS" "oui"
+
 echo; [ "$FAIL" = "0" ] && echo "RÉSULTAT : tout est conforme." || echo "RÉSULTAT : au moins un contrôle a échoué, ne passe pas à la suite."
 rm -rf "$TMP"; exit $FAIL

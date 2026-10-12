@@ -8,6 +8,7 @@ import evaluationsRouter from "./routes/evaluations.routes.js";
 import notificationsRouter from "./routes/notifications.routes.js";
 import reportsRouter from "./routes/reports.routes.js";
 import stagiairesRouter from "./routes/stagiaires.routes.js";
+import usersRouter from "./routes/users.routes.js";
 import { scheduleEndOfCycleReports } from "./jobs/endOfCycleReports.job.js";
 import { swaggerSpec, swaggerUi } from "./lib/swagger.js";
 import { errorHandler } from "./lib/http-error.js";
@@ -49,6 +50,7 @@ app.use("/api/activities", activitiesRouter);
 app.use("/api/evaluations", evaluationsRouter);
 app.use("/api/reports", reportsRouter);
 app.use("/api/notifications", notificationsRouter);
+app.use("/api/users", usersRouter);
 app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 scheduleEndOfCycleReports();
