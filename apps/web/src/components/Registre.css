@@ -1,0 +1,112 @@
+/* apps/web/src/components/Registre.css
+   Tous les styles sont portés par la classe .registre : rien ne fuit sur les autres écrans.
+   Teintes issues du logo LOCAPAY : #07C0A1. Le texte vert utilise une variante plus foncée
+   (#047A66, contraste 5,3:1 sur blanc) car #07C0A1 seul n'atteint que 2,3:1. */
+
+.registre {
+  --rg-green: #07c0a1;
+  --rg-green-ink: #047a66;
+  --rg-ink: #0b1f1a;
+  --rg-muted: #5b6b66;
+  --rg-line: #e3eae6;
+  --rg-hover: #f4f9f7;
+  font-family: Poppins, Inter, system-ui, sans-serif;
+  color: var(--rg-ink);
+}
+.registre h2 { font-family: Poppins, Inter, system-ui, sans-serif; font-weight: 600; letter-spacing: -0.01em; }
+
+/* ---------- Bandeau de chiffres ---------- */
+.registre-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 20px 0 8px;
+  padding: 0;
+  list-style: none;
+}
+.registre-stat { display: flex; align-items: baseline; gap: 10px; padding: 0 20px; border-left: 1px solid var(--rg-line); }
+.registre-stat:first-child { padding-left: 0; border-left: 0; }
+.registre-stat-value { margin: 0; font-size: 32px; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
+.registre-stat-value.is-accent { color: var(--rg-green-ink); }
+.registre-stat-label { font-size: 13px; color: var(--rg-muted); }
+
+/* ---------- Tableau ---------- */
+.registre-scroll { overflow-x: auto; }
+.registre-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.registre-table th {
+  text-align: left; padding: 14px 12px 10px;
+  font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--rg-muted); border-bottom: 1px solid var(--rg-line);
+}
+.registre-table td { padding: 14px 12px; border-bottom: 1px solid var(--rg-line); vertical-align: middle; }
+.registre-table .col-num { width: 48px; font-variant-numeric: tabular-nums; color: var(--rg-muted); font-size: 12px; }
+.registre-row { transition: background 0.15s ease; }
+.registre-row:hover { background: var(--rg-hover); }
+.registre-row.is-clickable { cursor: pointer; }
+
+.registre-person { display: flex; align-items: center; gap: 10px; }
+.registre-avatar {
+  width: 32px; height: 32px; flex-shrink: 0; border-radius: 50%;
+  display: grid; place-items: center;
+  background: #e6f7f3; color: var(--rg-green-ink); font-size: 12px; font-weight: 600;
+}
+.registre-name { font-weight: 600; }
+.registre-name-button { background: none; border: 0; padding: 0; color: inherit; font: inherit; font-weight: 600; text-align: left; cursor: pointer; }
+.registre-name-button:focus-visible { outline: 2px solid var(--rg-green-ink); outline-offset: 3px; border-radius: 4px; }
+
+/* ---------- Parcours en perles ---------- */
+.registre-beads { display: inline-flex; gap: 4px; align-items: center; }
+.bead { width: 8px; height: 8px; border-radius: 50%; border: 1px solid #b8c7c1; background: transparent; }
+.bead.is-filled { background: var(--rg-green); border-color: var(--rg-green); }
+.bead.is-current { background: var(--rg-ink); border-color: var(--rg-ink); transform: scale(1.35); }
+
+/* ---------- Dernière entrée ---------- */
+.registre-last { display: flex; flex-direction: column; gap: 2px; max-width: 280px; }
+.registre-last-title { font-size: 13px; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.registre-last-when { font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--rg-muted); }
+.registre-muted { color: var(--rg-muted); }
+
+/* ---------- Visa : le cachet ---------- */
+.visa {
+  display: inline-block; padding: 3px 9px; border-radius: 4px;
+  font-size: 10.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap;
+}
+/* Visé : cachet plein, texte sombre sur le vert de marque (contraste 7:1) */
+.visa--vise { background: var(--rg-green); color: var(--rg-ink); transform: rotate(-2deg); }
+/* En attente : contour en pointillés */
+.visa--attente { border: 1px dashed var(--rg-green-ink); color: var(--rg-green-ink); }
+/* À revoir : contour plein, sombre */
+.visa--revoir { border: 1.5px solid var(--rg-ink); color: var(--rg-ink); }
+.visa--brouillon, .visa--vide { border: 1px dashed #b8c7c1; color: var(--rg-muted); }
+.visa--termine { border: 1px solid var(--rg-line); color: var(--rg-muted); background: #f3f6f4; }
+.visa--annule { border: 1px solid var(--rg-line); color: var(--rg-muted); text-decoration: line-through; }
+
+/* ---------- Apparition en cascade (CSS seul, pas de dépendance) ---------- */
+@keyframes registre-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.registre-row { animation: registre-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both; animation-delay: calc(var(--i, 0) * 45ms); }
+@media (prefers-reduced-motion: reduce) {
+  .registre-row { animation: none; }
+  .registre-row, .bead { transition: none; }
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 900px) {
+  .registre-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 16px; }
+  .registre-stat:nth-child(3) { padding-left: 0; border-left: 0; }
+}
+@media (max-width: 760px) {
+  .registre-table thead { display: none; }
+  .registre-table, .registre-table tbody, .registre-table tr, .registre-table td { display: block; width: 100%; }
+  .registre-table tr { border: 1px solid var(--rg-line); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; }
+  .registre-table td { border: 0; padding: 6px 0; }
+  .registre-table td.col-num { width: auto; }
+  .registre-table td::before {
+    content: attr(data-label); display: block; margin-bottom: 2px;
+    font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--rg-muted);
+  }
+  .registre-last { max-width: none; }
+}
+@media (max-width: 480px) {
+  .registre-stats { grid-template-columns: 1fr 1fr; }
+  .registre-stat { flex-direction: column; gap: 4px; padding: 0 12px; }
+  .registre-stat-value { font-size: 26px; }
+}

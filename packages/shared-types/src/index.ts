@@ -42,6 +42,7 @@ export interface Activity {
   durationMinutes: number;
   status: ActivityStatus;
   tutorComment?: string | null;
+  createdAt?: string;
 }
 
 export interface Evaluation {

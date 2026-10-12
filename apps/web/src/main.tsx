@@ -22,9 +22,11 @@ import type {
 import { Badge } from "./components/Badge";
 import { DataTable } from "./components/DataTable";
 import { KpiCard } from "./components/KpiCard";
+import { RegistreStats, RegistreTable } from "./components/Registre";
 import { Shell } from "./components/Shell";
 import { useApiResource } from "./hooks/useApiResource";
 import { api, downloadReportPdf, login, type Session } from "./lib/api";
+import { registreStats } from "./lib/registre";
 import { ChangePasswordScreen } from "./pages/ChangePasswordScreen";
 import "./styles.css";
 
@@ -203,10 +205,14 @@ function DashboardView({
 
 function StagiairesView({
   stagiaires,
+  activities,
+  reports,
   reload,
   canCreate,
 }: {
   stagiaires: Stagiaire[];
+  activities: ActivityType[];
+  reports: Report[];
   reload: () => void;
   canCreate: boolean;
 }) {
@@ -287,50 +293,10 @@ function StagiairesView({
         </select>
       </div>
 
-      <DataTable
-        columns={[
-          {
-            header: "Stagiaire",
-            render: (item) => (
-              <div>
-                <strong>
-                  {item.user?.firstName} {item.user?.lastName}
-                </strong>
-                <small>{item.subject}</small>
-              </div>
-            ),
-          },
-          {
-            header: "École & Niveau",
-            render: (item) => (
-              <div>
-                {item.school}
-                <small>{item.fieldOfStudy} · {item.level}</small>
-              </div>
-            ),
-          },
-          {
-            header: "Service",
-            accessor: "service",
-          },
-          {
-            header: "Tuteur",
-            render: (item) =>
-              item.tutor ? `${item.tutor.firstName} ${item.tutor.lastName}` : "Non assigné",
-          },
-          {
-            header: "Période",
-            render: (item) =>
-              `${new Date(item.startDate).toLocaleDateString("fr-FR")} - ${new Date(item.endDate).toLocaleDateString("fr-FR")}`,
-          },
-          {
-            header: "Statut",
-            render: (item) => <Badge value={item.status} />,
-          },
-        ]}
-        data={filtered}
-        keyExtractor={(item) => item.id}
-      />
+      <div className="registre">
+        <RegistreStats stats={registreStats(stagiaires, activities, reports)} />
+        <RegistreTable stagiaires={filtered} activities={activities} />
+      </div>
 
       {showModal && (
         <div className="modal-backdrop" onClick={() => setShowModal(false)}>
@@ -1068,6 +1034,8 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
           {view === "stagiaires" && (
             <StagiairesView
               stagiaires={stagiaires.data}
+              activities={activities.data}
+              reports={reports.data}
               reload={stagiaires.reload}
               canCreate={canManageStagiaires}
             />
