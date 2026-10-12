@@ -63,9 +63,11 @@ else skip "aucune activité d'un autre tuteur en base"; fi
 echo; echo "4. Changement de mot de passe obligatoire"
 # Crée un stagiaire de test (e-mail horodaté) : il reste en base après l'exécution.
 MDP_EMAIL="test.mdp.$(date +%s)@stagiaire.locapay.bj"
-TEMP_PASS=$(curl -s -X POST "$BASE/api/stagiaires" -H "Authorization: Bearer $T_RH" -H 'Content-Type: application/json' \
+# La réponse est conservée pour le contrôle de la section 6 (pas de seconde création).
+curl -s -X POST "$BASE/api/stagiaires" -H "Authorization: Bearer $T_RH" -H 'Content-Type: application/json' \
   -d "{\"email\":\"$MDP_EMAIL\",\"firstName\":\"Test\",\"lastName\":\"Motdepasse\",\"tutorId\":\"$U_TU\",\"school\":\"Test\",\"fieldOfStudy\":\"Test\",\"level\":\"L3\",\"startDate\":\"2026-10-01T00:00:00.000Z\",\"endDate\":\"2026-12-31T00:00:00.000Z\",\"typeStage\":\"INITIATION\",\"subject\":\"Test securite\",\"service\":\"Test\"}" \
-  | python3 -c "import sys,json;print(json.load(sys.stdin)['temporaryPassword'])" 2>/dev/null)
+  > "$TMP/creation.json"
+TEMP_PASS=$(python3 -c "import json;print(json.load(open('$TMP/creation.json'))['temporaryPassword'])" 2>/dev/null)
 if [ -n "$TEMP_PASS" ]; then
   MUST=$(curl -s -X POST "$BASE/api/auth/login" -H 'Content-Type: application/json' -d "{\"email\":\"$MDP_EMAIL\",\"password\":\"$TEMP_PASS\"}" \
     | python3 -c "import sys,json;print(json.load(sys.stdin)['user'].get('mustChangePassword'))" 2>/dev/null)
@@ -93,6 +95,17 @@ check "GET /api/users/tutors par un stagiaire" "$(code "$BASE/api/users/tutors" 
 check "GET /api/users/tutors par la RH" "$(code "$BASE/api/users/tutors" -H "Authorization: Bearer $T_RH")" "200"
 CHAMPS=$(get "$T_RH" /api/users/tutors | python3 -c "import sys,json;d=json.load(sys.stdin);print('oui' if d and all(set(t)=={'id','firstName','lastName'} for t in d) else 'non')" 2>/dev/null)
 check "réponse limitée à id, prénom, nom (ni mot de passe ni e-mail)" "$CHAMPS" "oui"
+
+echo; echo "6. Aucun hash de mot de passe dans les réponses"
+# Cherche, à toute profondeur, une clé « password » ou « passwordHash » (temporaryPassword est attendu, lui).
+HASH=$(python3 -c "
+import json
+def walk(o):
+    if isinstance(o, dict): return any(k in ('password','passwordHash') or walk(v) for k,v in o.items())
+    if isinstance(o, list): return any(walk(v) for v in o)
+    return False
+d=json.load(open('$TMP/creation.json')); print('absent' if 'temporaryPassword' in d and not walk(d) else 'présent')" 2>/dev/null)
+check "réponse de POST /api/stagiaires sans password ni passwordHash" "${HASH:-réponse illisible}" "absent"
 
 echo; [ "$FAIL" = "0" ] && echo "RÉSULTAT : tout est conforme." || echo "RÉSULTAT : au moins un contrôle a échoué, ne passe pas à la suite."
 rm -rf "$TMP"; exit $FAIL
