@@ -1,5 +1,6 @@
 import bcrypt from "bcrypt";
 import { randomBytes } from "node:crypto";
+import { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { HttpError } from "../lib/http-error.js";
 import type { UserRole } from "@locapay/shared-types";
@@ -97,6 +98,12 @@ export async function createStagiaire(input: {
       user: { select: { id: true, email: true, firstName: true, lastName: true, role: true, isActive: true, mustChangePassword: true } },
       tutor: true,
     },
+  }).catch((error: unknown) => {
+    // Contrainte d'unicité sur User.email : message lisible plutôt que l'erreur brute de Prisma.
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      throw new HttpError(409, "Un compte existe déjà avec cette adresse e-mail");
+    }
+    throw error;
   });
   return { stagiaire, temporaryPassword };
 }

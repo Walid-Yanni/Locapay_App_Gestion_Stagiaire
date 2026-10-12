@@ -13,4 +13,7 @@ export const createStagiaireSchema = z.object({
   typeStage: z.enum(["OBLIGATOIRE", "INITIATION", "PROFESSIONNEL"]),
   subject: z.string().min(3),
   service: z.string().min(2),
+}).refine((data) => new Date(data.endDate) > new Date(data.startDate), {
+  path: ["endDate"],
+  message: "La date de fin doit être postérieure à la date de début",
 });
