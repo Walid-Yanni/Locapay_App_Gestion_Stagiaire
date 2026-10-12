@@ -10,10 +10,10 @@
   --rg-muted: #5b6b66;
   --rg-line: #e3eae6;
   --rg-hover: #f4f9f7;
-  font-family: Poppins, Inter, system-ui, sans-serif;
+  font-family: Poppins, system-ui, sans-serif;
   color: var(--rg-ink);
 }
-.registre h2 { font-family: Poppins, Inter, system-ui, sans-serif; font-weight: 600; letter-spacing: -0.01em; }
+.registre h2 { font-family: Poppins, system-ui, sans-serif; font-weight: 600; letter-spacing: -0.01em; }
 
 /* ---------- Bandeau de chiffres ---------- */
 .registre-stats {

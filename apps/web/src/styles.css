@@ -19,11 +19,11 @@ body {
   margin: 0;
   background: var(--paper);
   color: var(--ink);
-  font-family: Inter, system-ui, sans-serif;
+  font-family: var(--lp-font);
 }
 button, input { font: inherit; }
 button { cursor: pointer; }
-h1, h2 { font-family: Fraunces, Georgia, serif; margin: 0; }
+h1, h2 { font-family: var(--lp-font); font-weight: 600; letter-spacing: -0.01em; margin: 0; }
 
 .login-screen {
   min-height: 100vh;
@@ -40,7 +40,13 @@ h1, h2 { font-family: Fraunces, Georgia, serif; margin: 0; }
   padding: 28px;
   box-shadow: 0 24px 60px rgba(23, 33, 27, 0.08);
 }
-.eyebrow { color: var(--pine); font-weight: 800; letter-spacing: 0; }
+.eyebrow {
+  color: var(--lp-green-text);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
 .form { display: grid; gap: 14px; margin: 24px 0; }
 label { display: grid; gap: 6px; font-weight: 700; }
 input {
