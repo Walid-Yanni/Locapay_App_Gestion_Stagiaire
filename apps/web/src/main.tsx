@@ -22,6 +22,7 @@ import type {
 import { Badge } from "./components/Badge";
 import { DataTable } from "./components/DataTable";
 import { KpiCard } from "./components/KpiCard";
+import { PageHeader, todayLabel } from "./components/PageHeader";
 import { RegistreStats, RegistreTable } from "./components/Registre";
 import { Shell } from "./components/Shell";
 import { useApiResource } from "./hooks/useApiResource";
@@ -134,6 +135,7 @@ function DashboardView({
 
   return (
     <section className="stack">
+      <PageHeader eyebrow={`Vue d'ensemble · ${todayLabel()}`} title="Tableau de bord" />
       <div className="kpi-grid">
         <KpiCard
           title="Stages actifs"
@@ -265,18 +267,19 @@ function StagiairesView({
   }
 
   return (
-    <section className="table-card">
-      <div className="section-head">
-        <div>
-          <h2>Gestion des Stagiaires</h2>
-          <p>Cycle de vie, affectations et informations académiques.</p>
-        </div>
-        {canCreate && (
-          <button className="secondary-button" onClick={() => setShowModal(true)}>
+    <>
+    <PageHeader
+      eyebrow={`Journal de bord · ${todayLabel()}`}
+      title="Registre des stagiaires"
+      action={
+        canCreate && (
+          <button className="pill-button" onClick={() => setShowModal(true)}>
             <Plus size={16} /> Nouveau stagiaire
           </button>
-        )}
-      </div>
+        )
+      }
+    />
+    <section className="table-card">
 
       <div className="filter-bar">
         <input
@@ -404,6 +407,7 @@ function StagiairesView({
         </div>
       )}
     </section>
+    </>
   );
 }
 
@@ -461,16 +465,17 @@ function ActivitiesView({
   const canReview = role === "TUTEUR" || role === "ADMIN_RH" || role === "RESPONSABLE_RH";
 
   return (
-    <section className="table-card">
-      <div className="section-head">
-        <div>
-          <h2>Journal d'activités</h2>
-          <p>Saisie quotidienne, suivi des heures et validation par les tuteurs.</p>
-        </div>
-        <button className="secondary-button" onClick={() => setShowModal(true)}>
+    <>
+    <PageHeader
+      eyebrow={todayLabel()}
+      title="Suivi du jour"
+      action={
+        <button className="pill-button" onClick={() => setShowModal(true)}>
           <Plus size={16} /> Nouvelle activité
         </button>
-      </div>
+      }
+    />
+    <section className="table-card">
 
       <DataTable
         columns={[
@@ -592,6 +597,7 @@ function ActivitiesView({
         </div>
       )}
     </section>
+    </>
   );
 }
 
@@ -634,18 +640,19 @@ function EvaluationsView({
   }
 
   return (
-    <section className="table-card">
-      <div className="section-head">
-        <div>
-          <h2>Évaluations de stage</h2>
-          <p>Grille multi-critères (technique, communication, autonomie, ponctualité).</p>
-        </div>
-        {canEvaluate && (
-          <button className="secondary-button" onClick={() => setShowModal(true)}>
+    <>
+    <PageHeader
+      eyebrow="Entretiens de suivi"
+      title="Évaluations"
+      action={
+        canEvaluate && (
+          <button className="pill-button" onClick={() => setShowModal(true)}>
             <Plus size={16} /> Nouvelle évaluation
           </button>
-        )}
-      </div>
+        )
+      }
+    />
+    <section className="table-card">
 
       <DataTable
         columns={[
@@ -768,6 +775,7 @@ function EvaluationsView({
         </div>
       )}
     </section>
+    </>
   );
 }
 
@@ -810,22 +818,23 @@ function ReportsView({
   }
 
   return (
-    <section className="table-card">
-      <div className="section-head">
-        <div>
-          <h2>Rapports de stage & Certificats</h2>
-          <p>Consolidation des heures, signatures électroniques et téléchargement PDF.</p>
-        </div>
-        {stagiaires.length > 0 && (
+    <>
+    <PageHeader
+      eyebrow="Fin de stage"
+      title="Rapports et certificats"
+      action={
+        stagiaires.length > 0 && (
           <button
-            className="secondary-button"
+            className="pill-button"
             disabled={generating}
             onClick={() => handleGenerateFinal(stagiaires[0].id)}
           >
             <Plus size={16} /> Générer rapport ({stagiaires[0]?.user?.firstName})
           </button>
-        )}
-      </div>
+        )
+      }
+    />
+    <section className="table-card">
 
       <DataTable
         columns={[
@@ -888,6 +897,7 @@ function ReportsView({
         keyExtractor={(item) => item.id}
       />
     </section>
+    </>
   );
 }
 
@@ -904,13 +914,9 @@ function NotificationsView({
   }
 
   return (
+    <>
+    <PageHeader eyebrow="Messages" title="Notifications" />
     <section className="table-card">
-      <div className="section-head">
-        <div>
-          <h2>Notifications</h2>
-          <p>Alertes RH, validations de journal et échéances de stage.</p>
-        </div>
-      </div>
 
       <div className="stack">
         {notifications.length === 0 ? (
@@ -943,6 +949,7 @@ function NotificationsView({
         )}
       </div>
     </section>
+    </>
   );
 }
 
