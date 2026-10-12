@@ -13,6 +13,23 @@ export interface Session {
   };
 }
 
+export interface ApiIssue {
+  path: (string | number)[];
+  message: string;
+}
+
+// Erreur d'API : garde le statut HTTP et, pour une 400 de validation Zod, le détail par champ.
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+    public readonly issues?: ApiIssue[],
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
 export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = localStorage.getItem("accessToken");
   const response = await fetch(`${API_URL}${path}`, {
@@ -26,7 +43,11 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ message: "Erreur reseau" }));
-    throw new Error(error.message ?? "Erreur API");
+    throw new ApiError(
+      error.message ?? "Erreur API",
+      response.status,
+      Array.isArray(error.issues) ? error.issues : undefined,
+    );
   }
 
   return response.json();
