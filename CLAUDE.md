@@ -26,6 +26,7 @@ un job génère le rapport final → signatures → archivage et analytics.
   lance `pnpm typecheck` et `pnpm build` et rapporte le résultat réel.
 - Langue : français (UI, commentaires, messages de commit). Identifiants de code en anglais, comme existant.
 - Aucun emoji dans l'interface.
+- Garde ce fichier **court et exact** : n'y inscris que ce qui est vérifié dans le code, aucune promesse.
 
 ## 3. Stack et structure
 
@@ -56,18 +57,23 @@ pnpm build
 
 Points d'accès : `GET /health`, Swagger sur `/api/docs`, PDF d'un rapport sur `GET /api/reports/:id/pdf`.
 
+Contrôle de sécurité (API démarrée, développement uniquement) :
+`STAGIAIRE=<email d'un stagiaire du seed> bash scripts/check-securite.sh`
+(ex. `faridath.lawson@stagiaire.locapay.bj`). Le script crée un stagiaire de test qui reste en base.
+
 **Pièges connus (vérifiés) :**
 1. `apps/web` importe `@locapay/shared-types` depuis son `dist/`. Sans build préalable, le typecheck du web
    échoue avec « Cannot find module '@locapay/shared-types' » : lancer d'abord
    `pnpm --filter @locapay/shared-types build`.
-2. `docker-compose.yml` publie PostgreSQL sur le port **5433**, alors que `.env.example` pointe sur **5432**.
-   À aligner (l'un ou l'autre) avant de diagnostiquer une erreur de connexion.
+2. Base de données : `docker-compose.yml` publie PostgreSQL sur le port **5433** ; `.env.example` et
+   `apps/api/.env.example` sont alignés sur 5433. Migration initiale : `prisma/migrations/20261011163209_init`.
 3. `apps/web/src/main.tsx` est volumineux (la plupart des vues y vivent). Extrais les vues en composants
    **une à la fois**, sur demande, jamais en masse.
 
 Variables d'environnement : `DATABASE_URL`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, `PORT`, `WEB_ORIGIN`,
 `VITE_API_URL`. Comptes de démonstration (dev uniquement, mot de passe `Locapay2026!`) :
-`admin.rh@locapay.bj`, `responsable.rh@locapay.bj`, `w.sacca@locapay.bj` (tuteur), un compte stagiaire (voir `prisma/seed.ts`).
+`admin.rh@locapay.bj`, `responsable.rh@locapay.bj`, `w.sacca@locapay.bj` (tuteur), stagiaires en
+`@stagiaire.locapay.bj` (voir `prisma/seed.ts`).
 
 ## 5. Architecture de l'API (à respecter)
 
@@ -75,8 +81,17 @@ Variables d'environnement : `DATABASE_URL`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, 
   prépare la réponse) → `services/` (logique métier + Prisma). Un service ne connaît pas Express.
 - Imports ESM avec extension `.js` (`import { prisma } from "../lib/prisma.js"`).
 - Validation d'entrée avec **Zod** dans `schemas/`, appliquée par `middlewares/validate.middleware.ts`.
-- `requireAuth(rolesAutorises?)` décode le JWT et pose `req.user = { sub: userId, role }`
-  (type `AuthenticatedRequest`). Mots de passe hachés avec bcrypt.
+- `requireAuth(rolesAutorises?, options?)` décode le JWT et pose `req.user = { sub: userId, role }`
+  (type `AuthenticatedRequest`). Il **relit l'utilisateur en base à chaque requête** : compte absent ou
+  inactif → 401 ; `mustChangePassword` → 403 avec `code: "PASSWORD_CHANGE_REQUIRED"` (sauf
+  `allowPendingPasswordChange`, utilisé par `POST /api/auth/change-password`). Mots de passe hachés avec bcrypt.
+- Démarrage : `server.ts` refuse de démarrer si `JWT_SECRET` ou `JWT_REFRESH_SECRET` est absent ou fait
+  moins de 32 caractères.
+- Création de stagiaire : le tuteur doit exister, avoir le rôle `TUTEUR` et être actif (sinon 400). Le mot de
+  passe temporaire est généré côté serveur, renvoyé une seule fois, et le compte est créé avec `mustChangePassword`.
+- Rapports : `signReport` est atomique (`prisma.$transaction`), chaque rôle ne pose que son indicateur
+  (`signedByTutor` / `signedByRH` / `signedByStagiaire`), statut `SIGNE` seulement quand les trois sont réunis.
+  Le PDF renvoie 403 si l'accès est refusé, 404 si le rapport n'existe pas.
 - Job de fin de cycle : `jobs/endOfCycleReports.job.ts`, cron quotidien 02:00, **idempotent**
   (ne génère jamais deux rapports finals pour un stagiaire), bascule le statut du stage sur `TERMINE`.
   Ne casse pas cette idempotence.
@@ -92,7 +107,6 @@ Enums à utiliser tels quels (ne pas inventer d'autres valeurs) :
 **Écarts connus avec le cahier des charges** (décisions à trancher, ne pas « corriger » sans accord) :
 - `Evaluation` : 4 scores fixes (technique, communication, autonomie, ponctualité) au lieu de la grille à
   8 critères (`criteriaJson`), et **pas de champ `type`** (J+7 / J+30 / mi-parcours / fin).
-- `Report` : un seul `signedAt`, alors que le cahier prévoit trois signatures (tuteur, RH, stagiaire).
 - Types de `ReportType` : `MENSUEL` ici, `MI_PARCOURS` dans le cahier.
 
 ## 7. Sécurité — règles non négociables
@@ -102,10 +116,12 @@ Enums à utiliser tels quels (ne pas inventer d'autres valeurs) :
    - `STAGIAIRE` : résoudre son profil via `userId = req.user.sub` et ne voir/créer que ses propres données.
    - `TUTEUR` : uniquement les stagiaires dont `tutorId === req.user.sub`.
    - `ADMIN_RH` / `RESPONSABLE_RH` : accès global.
+
+   En place sur stagiaires, activités, évaluations et rapports ; contrôlé par `scripts/check-securite.sh` (§4).
 2. Ne jamais faire confiance à un `stagiaireId` envoyé par le client sans le recouper avec l'appelant.
 3. Jamais de secret réel dans le dépôt (`.env` ignoré par Git). Ne pas lire ni afficher le contenu d'un `.env`.
-4. Pas de repli silencieux sur un secret par défaut : l'API doit refuser de démarrer sans `JWT_SECRET`
-   et `JWT_REFRESH_SECRET`.
+4. Pas de repli silencieux sur un secret par défaut : l'API refuse de démarrer sans `JWT_SECRET`
+   et `JWT_REFRESH_SECRET` d'au moins 32 caractères. Ne réintroduis jamais de valeur par défaut.
 5. Les mots de passe ne sont jamais journalisés ni renvoyés après hachage ; un mot de passe temporaire
    n'est montré qu'une seule fois.
 6. Les restrictions visibles dans l'interface (menus, boutons) ne remplacent jamais le contrôle serveur.
@@ -113,16 +129,20 @@ Enums à utiliser tels quels (ne pas inventer d'autres valeurs) :
 ## 8. Frontend et identité visuelle
 
 - Les données viennent **uniquement de l'API** (`lib/api.ts`, hook `useApiResource`). Aucune donnée simulée.
-- Composants existants à réutiliser : `Shell`, `Sidebar`, `Topbar`, `KpiCard`, `DataTable`, `Badge`.
-- Responsive obligatoire : tableaux qui deviennent des cartes sous ~760 px (motif `data-label`), menu en tiroir
-  sous ~860 px, `prefers-reduced-motion` respecté.
+- **Design « Carnet RH » : référence dans `DESIGN.md`** (couleurs, typographie, gabarit, écrans).
+- Composants existants à réutiliser : `Shell`, `Sidebar`, `PageHeader`, `KpiCard`, `DataTable`, `Badge`,
+  `Registre` (`components/Registre.tsx` + `lib/registre.ts`). `Topbar.tsx` est conservé mais n'est plus rendu.
+- Responsive obligatoire : tableaux qui deviennent des cartes sous ~700 px (motif `data-label`), menu en tiroir
+  sous **900 px**, `prefers-reduced-motion` respecté.
 - **Marque** : vert LOCAPAY **`#07C0A1`** (valeur mesurée sur le fichier logo), police **Poppins**,
   vrai logo en `<img>` fixe (jamais redessiné ni régénéré par une IA).
 - **Contraste** : `#07C0A1` sur blanc n'atteint que 2,3:1. Pour du **texte** vert, utiliser `#047A66` (5,3:1) ;
   pour du texte sur fond `#07C0A1`, un texte sombre (`#0B1F1A`), pas du blanc.
-- Tokens actuels de `styles.css` (hérités du prototype : `--pine: #0f5b45`, Fraunces/Inter) à **migrer
-  progressivement** vers la marque ci-dessus, écran par écran. Les nouveaux composants portent leurs styles
-  sous une classe racine (ex. `.registre`) pour ne pas fuir sur les autres écrans.
+- Tokens : **`apps/web/src/tokens.css`** (variables `--lp-*`), seule source des couleurs et de la police.
+  Les anciennes variables de `styles.css` (`--pine`, `--ink`...) en sont des alias. Poppins seule (plus de
+  Fraunces ni d'Inter). Gabarit commun en place : barre latérale sombre, `PageHeader` sur toutes les vues,
+  fond tramé de losanges. Les nouveaux composants portent leurs styles sous une classe racine
+  (ex. `.registre`) pour ne pas fuir sur les autres écrans.
 - Direction « carnet de stage » : lignes de registre numérotées (pas de grille de cartes), parcours en perles,
   statuts en « cachets » sans le trio rouge/orange/vert, apparition en cascade, pas d'emojis ni d'icônes génériques
   ajoutées à la volée.
@@ -138,25 +158,26 @@ Vocabulaire d'interface (n'altère jamais les enums du backend, c'est une table 
 
 ## 9. État d'avancement
 
-Fait : monorepo, schéma Prisma, API en couches (stagiaires, activités, évaluations, rapports,
-notifications), auth JWT par rôle, job de fin de cycle, PDF Puppeteer, Swagger, front web connecté à l'API,
-mobile minimal (journal d'activités).
+Fait (vérifié au 12 oct. 2026) : monorepo, schéma Prisma et migration initiale, API en couches, auth JWT
+par rôle **avec portée par utilisateur** (§7.1), changement de mot de passe obligatoire (API + écran web),
+mot de passe temporaire généré côté serveur, secrets JWT validés au démarrage, signature tripartite atomique,
+job de fin de cycle, PDF Puppeteer, Swagger, port DB aligné. Front : gabarit « Carnet RH » (tokens, Poppins,
+barre latérale avec logo réel, `PageHeader`, fond tramé, tiroir sous 900 px), Registre des stagiaires.
+Mobile minimal (journal d'activités).
 
-À faire, par priorité (vérifier dans le code avant de s'y mettre ; état au commit `984f790`, 8 sept. 2026,
-aucune de ces corrections n'était encore sur `main`) :
-1. **[Sécurité] Portée par utilisateur** sur activités, stagiaires, évaluations, rapports (section 7.1).
-   `POST /activities` et `PATCH /activities/:id/review` acceptent aujourd'hui un `stagiaireId` non recoupé.
-2. **Signature à trois parties** du rapport (`signedByTutor/RH/Stagiaire` + migration) ; passage à `SIGNE`
-   seulement quand les trois sont réunies, chacun ne signant que pour son rôle.
-3. **Mot de passe temporaire** généré côté serveur à la création d'un stagiaire (retirer le champ du formulaire) +
-   écran de changement de mot de passe à la première connexion.
-4. **Fail-fast des secrets JWT** au démarrage (retirer `?? "dev-secret"` dans `auth.service.ts`).
-5. Décider du sort de la **grille d'évaluation** (section 6) avant de construire l'interface dessus.
-6. Refonte UI : « Registre des stagiaires » (patch fourni : `Registre.tsx`, `Registre.css`, `lib/registre.ts` —
-   vérifier s'il est appliqué), puis `StampButton` (appui prolongé, Framer Motion, branché sur
-   `PATCH /api/activities/:id/review`), fiche « Carnet de stage », « Suivi du jour », versions mobile.
-7. Sidebar : intégrer le logo réel (`apps/web/public/`) ; aligner `docker-compose` / `.env.example` (port DB).
-8. Plus tard : SSO LOCAPAY, synchro des employés, stockage S3 des documents, notifications push (FCM).
+À faire, dans cet ordre (vérifier dans le code avant de s'y mettre) :
+1. **Formulaire de création de stagiaire** : choix du tuteur, vraies dates, et mot de passe temporaire affiché
+   dans une fenêtre propre avec bouton « Copier » (aujourd'hui `window.alert`).
+2. **Carnet de stage** : fiche stagiaire en double page (DESIGN.md §5).
+3. **Suivi du jour** avec `StampButton` (appui long pour viser, branché sur `PATCH /api/activities/:id/review`).
+4. **[Sécurité] Limitation des tentatives de connexion** (`express-rate-limit`), **avant toute mise en ligne**.
+5. Libellé de la barre latérale selon le rôle (« CARNET RH » ou « CARNET DE STAGE »).
+6. Remise à zéro propre des comptes de test créés par `scripts/check-securite.sh`.
+7. Décision sur le champ « Lieu », absent du modèle (DESIGN.md §8).
+8. Tests automatisés.
+
+À trancher avant d'y toucher : la **grille d'évaluation** (§6). Plus tard : versions mobile des écrans
+« Carnet RH », SSO LOCAPAY, synchro des employés, stockage S3 des documents, notifications push (FCM).
 
 ## 10. Définition de « terminé »
 
