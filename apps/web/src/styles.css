@@ -1,11 +1,14 @@
+@import "./tokens.css";
+
+/* Variables héritées du prototype : alias vers les tokens de marque (migration écran par écran). */
 :root {
-  --ink: #17211b;
-  --muted: #657067;
-  --line: #dce5dd;
-  --paper: #fbfcf8;
-  --panel: #ffffff;
-  --pine: #0f5b45;
-  --mint: #dff4e6;
+  --ink: var(--lp-ink);
+  --muted: var(--lp-muted);
+  --line: var(--lp-line);
+  --paper: var(--lp-page);
+  --panel: var(--lp-card);
+  --pine: var(--lp-green-text);
+  --mint: var(--lp-green-pale);
   --blue: #dceafd;
   --orange: #ffe8bf;
   --red: #ffe0df;
@@ -54,10 +57,11 @@ input {
   min-height: 40px;
 }
 .primary-button {
-  background: var(--pine);
-  color: #fff;
-  border-color: var(--pine);
-  font-weight: 800;
+  background: var(--lp-green);
+  color: var(--lp-on-green);
+  border-color: var(--lp-green);
+  border-radius: 999px;
+  font-weight: 600;
 }
 .secondary-button, .nav-item {
   display: inline-flex;

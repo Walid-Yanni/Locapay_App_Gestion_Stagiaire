@@ -1,0 +1,19 @@
+/* apps/web/src/tokens.css
+   Source unique des couleurs et polices de l'application (valeurs mesurées, voir DESIGN.md §2).
+   #07C0A1 seul n'atteint que 2,3:1 sur blanc : pour du texte vert, utiliser --lp-green-text. */
+
+:root {
+  --lp-green: #07c0a1;
+  --lp-green-text: #047a66;
+  --lp-on-green: #0b1f1a;
+  --lp-ink: #0e1f1e;
+  --lp-sidebar: #0f1f1e;
+  --lp-page: #fefdfb;
+  --lp-card: #ffffff;
+  --lp-green-pale: #ecfcf9;
+  --lp-avatar: #d9f3ee;
+  --lp-muted: #5b6b66;
+  --lp-line: #e3eae6;
+
+  --lp-font: Poppins, system-ui, sans-serif;
+}
