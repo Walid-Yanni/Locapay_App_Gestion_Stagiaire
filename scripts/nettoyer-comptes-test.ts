@@ -1,7 +1,10 @@
 // scripts/nettoyer-comptes-test.ts : supprime les comptes de test créés par check-securite.sh
 // (développement uniquement). Par défaut, simulation : n'affiche que ce qui serait supprimé.
-// Usage : pnpm --filter @locapay/api exec tsx ../../scripts/nettoyer-comptes-test.ts [--confirmer]
-// DATABASE_URL est lu par le client Prisma depuis apps/api/.env.
+// Usage : pnpm --filter @locapay/api exec tsx ../../scripts/nettoyer-comptes-test.ts [--email <adresse>] [--confirmer]
+//   --email <adresse> : ne vise que ce compte (test.mdp.* ou test.dates.* en @stagiaire.locapay.bj).
+//   --confirmer       : supprime réellement ; sans lui, simulation, même avec --email.
+// DATABASE_URL est lu par le client Prisma depuis apps/api/.env. Refus si la base n'est pas locale.
+// Codes de sortie : 0 succès, 1 refus ou erreur, 3 compte visé par --email introuvable.
 import { Prisma, PrismaClient } from "@prisma/client";
 
 const DOMAINE = "@stagiaire.locapay.bj";
@@ -25,15 +28,50 @@ const PROTEGES = [
   "Stagiairestest@gmail.com",
 ].map((email) => email.toLowerCase());
 
-const confirmer = process.argv.includes("--confirmer");
+const HOTES_LOCAUX = ["localhost", "127.0.0.1", "::1"];
+const INTROUVABLE = 3;
+
+class Refus extends Error {}
+
+function lireArguments(argv: string[]) {
+  const confirmer = argv.includes("--confirmer");
+  const i = argv.indexOf("--email");
+  if (i === -1) return { confirmer, email: undefined };
+  const email = argv[i + 1];
+  if (!email || email.startsWith("--")) throw new Refus("Arrêt : --email attend une adresse.");
+  const conforme = email.endsWith(DOMAINE) && PREFIXES.some((p) => email.startsWith(p) && email.length > p.length + DOMAINE.length);
+  if (!conforme) {
+    throw new Refus(`Arrêt : ${email} ne correspond pas à ${PREFIXES.map((p) => p + "*" + DOMAINE).join(" ou ")}.`);
+  }
+  return { confirmer, email };
+}
+
+// N'affiche jamais l'URL ni ses identifiants : seulement l'hôte quand il est refusé.
+function verifierBaseLocale() {
+  const url = process.env.DATABASE_URL;
+  if (!url) throw new Refus("Arrêt : DATABASE_URL est absent, impossible de vérifier que la base est locale.");
+  let hote: string;
+  try {
+    hote = new URL(url).hostname.replace(/^\[(.*)\]$/, "$1").toLowerCase();
+  } catch {
+    throw new Refus("Arrêt : DATABASE_URL n'est pas une URL lisible, impossible de vérifier que la base est locale.");
+  }
+  if (!HOTES_LOCAUX.includes(hote)) {
+    throw new Refus(`Arrêt : la base visée n'est pas locale (hôte « ${hote || "vide"} »). Ce script ne s'utilise que sur une base de développement locale.`);
+  }
+}
+
 const prisma = new PrismaClient();
 
 type Client = PrismaClient | Prisma.TransactionClient;
 
 // startsWith / endsWith : Prisma échappe % et _, aucun joker SQL possible.
-async function selectionner(db: Client) {
+async function selectionner(db: Client, email?: string) {
   const users = await db.user.findMany({
-    where: { OR: PREFIXES.map((prefix) => ({ email: { startsWith: prefix, endsWith: DOMAINE } })) },
+    where: {
+      OR: PREFIXES.map((prefix) => ({ email: { startsWith: prefix, endsWith: DOMAINE } })),
+      ...(email ? { email } : {}),
+    },
     select: {
       id: true,
       email: true,
@@ -47,7 +85,7 @@ async function selectionner(db: Client) {
 
   const interdits = users.filter((u) => PROTEGES.includes(u.email.toLowerCase()));
   if (interdits.length > 0) {
-    throw new Error(`Arrêt : comptes protégés dans la sélection : ${interdits.map((u) => u.email).join(", ")}`);
+    throw new Refus(`Arrêt : comptes protégés dans la sélection : ${interdits.map((u) => u.email).join(", ")}`);
   }
 
   const userIds = users.map((u) => u.id);
@@ -61,16 +99,26 @@ async function selectionner(db: Client) {
     proprietaire: await db.document.count({ where: { ownerId: { in: userIds }, stagiaireId: { notIn: stagiaireIds } } }),
   };
   if (bloquants.tuteur + bloquants.evaluateur + bloquants.proprietaire > 0) {
-    throw new Error(`Arrêt : comptes de test liés à d'autres stagiaires : ${JSON.stringify(bloquants)}`);
+    throw new Refus(`Arrêt : comptes de test liés à d'autres stagiaires : ${JSON.stringify(bloquants)}`);
   }
 
   return { users, userIds, stagiaireIds };
 }
 
 async function main() {
-  const { users, userIds, stagiaireIds } = await selectionner(prisma);
-  console.log(`${users.length} compte(s) sélectionné(s) (${PREFIXES.map((p) => p + "*" + DOMAINE).join(", ")}) :`);
+  // Arguments et hôte vérifiés avant toute requête, simulation comprise.
+  const { confirmer, email } = lireArguments(process.argv.slice(2));
+  verifierBaseLocale();
+
+  const { users, userIds, stagiaireIds } = await selectionner(prisma, email);
+  const cible = email ?? PREFIXES.map((p) => p + "*" + DOMAINE).join(", ");
+  console.log(`${users.length} compte(s) sélectionné(s) (${cible}) :`);
   for (const u of users) console.log(`  ${u.email}  ${u.firstName} ${u.lastName}  ${u.role}`);
+  if (email && users.length === 0) {
+    console.log("Compte introuvable : rien à supprimer.");
+    process.exitCode = INTROUVABLE;
+    return;
+  }
 
   const rapports = await prisma.report.findMany({
     where: { stagiaireId: { in: stagiaireIds } },
@@ -103,7 +151,7 @@ async function main() {
 
   // La sélection est refaite dans la transaction : on supprime exactement ce qui a été revérifié.
   const supprime = await prisma.$transaction(async (tx) => {
-    const sel = await selectionner(tx);
+    const sel = await selectionner(tx, email);
     const where = { stagiaireId: { in: sel.stagiaireIds } };
     return {
       Activity: (await tx.activity.deleteMany({ where })).count,
@@ -122,7 +170,8 @@ async function main() {
 
 main()
   .catch((error) => {
-    console.error(error instanceof Error ? error.message : error);
+    // Un refus n'affiche que son message ; toute autre erreur garde sa pile pour le diagnostic.
+    console.error(error instanceof Refus ? error.message : error);
     process.exitCode = 1;
   })
   .finally(() => prisma.$disconnect());
