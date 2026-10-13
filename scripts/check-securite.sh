@@ -97,15 +97,29 @@ CHAMPS=$(get "$T_RH" /api/users/tutors | python3 -c "import sys,json;d=json.load
 check "réponse limitée à id, prénom, nom (ni mot de passe ni e-mail)" "$CHAMPS" "oui"
 
 echo; echo "6. Aucun hash de mot de passe dans les réponses"
-# Cherche, à toute profondeur, une clé « password » ou « passwordHash » (temporaryPassword est attendu, lui).
-HASH=$(python3 -c "
-import json
+# hash_dans <fichier JSON> : « absent » si aucune clé password / passwordHash, à toute profondeur
+# (temporaryPassword et mustChangePassword sont attendus, eux) ; suivi du nombre d'éléments d'une liste.
+hash_dans() {
+  python3 -c "
+import json,sys
 def walk(o):
     if isinstance(o, dict): return any(k in ('password','passwordHash') or walk(v) for k,v in o.items())
     if isinstance(o, list): return any(walk(v) for v in o)
     return False
-d=json.load(open('$TMP/creation.json')); print('absent' if 'temporaryPassword' in d and not walk(d) else 'présent')" 2>/dev/null)
+d=json.load(open(sys.argv[1])); print(('présent' if walk(d) else 'absent') + ('|%d' % len(d) if isinstance(d, list) else '|-'))" "$1" 2>/dev/null
+}
+IFS='|' read -r HASH _ <<< "$(hash_dans "$TMP/creation.json")"
+[ -n "$TEMP_PASS" ] || HASH="création échouée"
 check "réponse de POST /api/stagiaires sans password ni passwordHash" "${HASH:-réponse illisible}" "absent"
+for ROLE in RH TU ST; do
+  VAR="T_$ROLE"; JETON="${!VAR}"
+  case $ROLE in RH) NOM="RH";; TU) NOM="tuteur";; ST) NOM="stagiaire";; esac
+  for ROUTE in activities evaluations reports; do
+    get "$JETON" "/api/$ROUTE" > "$TMP/h.json"
+    IFS='|' read -r HASH N <<< "$(hash_dans "$TMP/h.json")"
+    check "GET /api/$ROUTE ($NOM, ${N:-?} élément(s)) sans password ni passwordHash" "${HASH:-réponse illisible}" "absent"
+  done
+done
 
 echo; [ "$FAIL" = "0" ] && echo "RÉSULTAT : tout est conforme." || echo "RÉSULTAT : au moins un contrôle a échoué, ne passe pas à la suite."
 rm -rf "$TMP"; exit $FAIL

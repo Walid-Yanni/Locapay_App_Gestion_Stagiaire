@@ -4,7 +4,7 @@ import { prisma } from "../lib/prisma.js";
 import { HttpError } from "../lib/http-error.js";
 
 export async function login(email: string, password: string) {
-  const user = await prisma.user.findUnique({ where: { email } });
+  const user = await prisma.user.findUnique({ where: { email }, omit: { password: false } });
   if (!user?.isActive) throw new Error("Identifiants invalides");
 
   const valid = await bcrypt.compare(password, user.password);
@@ -26,7 +26,7 @@ export async function login(email: string, password: string) {
 }
 
 export async function changePassword(userId: string, currentPassword: string, newPassword: string) {
-  const user = await prisma.user.findUnique({ where: { id: userId } });
+  const user = await prisma.user.findUnique({ where: { id: userId }, omit: { password: false } });
   if (!user) throw new HttpError(404, "Utilisateur introuvable");
 
   // 400 et non 401 : le web ne doit pas confondre cette erreur avec une session expirée.
