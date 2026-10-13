@@ -2,12 +2,48 @@
 # scripts/check-securite.sh : vérifie la portée par utilisateur de l'API (développement uniquement).
 # Usage : STAGIAIRE=prenom.nom@stagiaire.locapay.bj bash scripts/check-securite.sh
 # L'API doit tourner (pnpm dev:api). Mot de passe des comptes du seed par défaut : Locapay2026!
+# Le compte de test créé en section 4 est supprimé à la sortie (même après un échec ou Ctrl+C)
+# par scripts/nettoyer-comptes-test.ts, seulement si BASE est locale et que la base de apps/api/.env l'est aussi.
 BASE="${BASE:-http://localhost:4000}"
 PASS="${PASS:-Locapay2026!}"
 RH="${RH:-admin.rh@locapay.bj}"
 TUTEUR="${TUTEUR:-w.sacca@locapay.bj}"
 STAGIAIRE="${STAGIAIRE:?Indique un e-mail de stagiaire, ex. STAGIAIRE=x@stagiaire.locapay.bj bash scripts/check-securite.sh}"
 TMP="$(mktemp -d)"; FAIL=0
+RACINE="$(cd "$(dirname "$0")/.." && pwd)"
+MDP_EMAIL=""; POST_FAIT=""; CREE_EMAIL=""
+
+base_locale() {
+  python3 -c "import sys;from urllib.parse import urlparse;print('oui' if (urlparse(sys.argv[1]).hostname or '') in ('localhost','127.0.0.1','::1') else 'non')" "$BASE" 2>/dev/null
+}
+
+# Sortie : supprime le compte de test de la section 4 ; le code de sortie reste celui des contrôles.
+nettoyage() {
+  local rc=$?
+  trap - EXIT INT TERM
+  if [ -n "$CREE_EMAIL" ]; then
+    echo
+    if [ "$(base_locale)" != "oui" ]; then
+      echo "Nettoyage sauté : BASE ($BASE) n'est pas locale."
+      echo "compte de test laissé en place : $CREE_EMAIL"
+    else
+      (cd "$RACINE/apps/api" && pnpm exec tsx ../../scripts/nettoyer-comptes-test.ts --email "$CREE_EMAIL" --confirmer) > "$TMP/nettoyage.log" 2>&1
+      case $? in
+        0) echo "Nettoyage : compte de test supprimé ($CREE_EMAIL)." ;;
+        3) echo "Nettoyage : compte de test déjà absent ($CREE_EMAIL)." ;;
+        *) grep -v '^$' "$TMP/nettoyage.log" | sed 's/^/  /'
+           echo "compte de test laissé en place : $CREE_EMAIL" ;;
+      esac
+    fi
+  elif [ -n "$MDP_EMAIL" ] && [ -z "$POST_FAIT" ]; then
+    echo; echo "Création interrompue : compte de test peut-être laissé en place : $MDP_EMAIL"
+  fi
+  rm -rf "$TMP"
+  exit $rc
+}
+trap nettoyage EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 login() { # $1 = e-mail, $2 = mot de passe (défaut $PASS) -> "jeton|idUtilisateur"
   curl -s -X POST "$BASE/api/auth/login" -H 'Content-Type: application/json' \
@@ -61,13 +97,15 @@ if [ -n "$ACT_F" ]; then
 else skip "aucune activité d'un autre tuteur en base"; fi
 
 echo; echo "4. Changement de mot de passe obligatoire"
-# Crée un stagiaire de test (e-mail horodaté) : il reste en base après l'exécution.
+# Crée un stagiaire de test (e-mail horodaté), supprimé à la sortie par nettoyage().
 MDP_EMAIL="test.mdp.$(date +%s)@stagiaire.locapay.bj"
 # La réponse est conservée pour le contrôle de la section 6 (pas de seconde création).
 curl -s -X POST "$BASE/api/stagiaires" -H "Authorization: Bearer $T_RH" -H 'Content-Type: application/json' \
   -d "{\"email\":\"$MDP_EMAIL\",\"firstName\":\"Test\",\"lastName\":\"Motdepasse\",\"tutorId\":\"$U_TU\",\"school\":\"Test\",\"fieldOfStudy\":\"Test\",\"level\":\"L3\",\"startDate\":\"2026-10-01T00:00:00.000Z\",\"endDate\":\"2026-12-31T00:00:00.000Z\",\"typeStage\":\"INITIATION\",\"subject\":\"Test securite\",\"service\":\"Test\"}" \
   > "$TMP/creation.json"
+POST_FAIT=1
 TEMP_PASS=$(python3 -c "import json;print(json.load(open('$TMP/creation.json'))['temporaryPassword'])" 2>/dev/null)
+[ -n "$TEMP_PASS" ] && CREE_EMAIL="$MDP_EMAIL"
 if [ -n "$TEMP_PASS" ]; then
   MUST=$(curl -s -X POST "$BASE/api/auth/login" -H 'Content-Type: application/json' -d "{\"email\":\"$MDP_EMAIL\",\"password\":\"$TEMP_PASS\"}" \
     | python3 -c "import sys,json;print(json.load(sys.stdin)['user'].get('mustChangePassword'))" 2>/dev/null)
@@ -122,4 +160,4 @@ for ROLE in RH TU ST; do
 done
 
 echo; [ "$FAIL" = "0" ] && echo "RÉSULTAT : tout est conforme." || echo "RÉSULTAT : au moins un contrôle a échoué, ne passe pas à la suite."
-rm -rf "$TMP"; exit $FAIL
+exit $FAIL
