@@ -1,8 +1,8 @@
 import bcrypt from "bcrypt";
-import { randomBytes } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { HttpError } from "../lib/http-error.js";
+import { generateTemporaryPassword } from "../lib/temporary-password.js";
 import type { UserRole } from "@locapay/shared-types";
 
 type Requester = { sub: string; role: UserRole };
@@ -70,7 +70,7 @@ export async function createStagiaire(input: {
   if (!tutor || tutor.role !== "TUTEUR" || !tutor.isActive) {
     throw new HttpError(400, "Le tuteur indiqué n'existe pas, n'a pas le rôle TUTEUR ou n'est pas actif");
   }
-  const temporaryPassword = randomBytes(9).toString("base64url");
+  const temporaryPassword = generateTemporaryPassword();
   const password = await bcrypt.hash(temporaryPassword, 10);
   const stagiaire = await prisma.stagiaire.create({
     data: {

@@ -107,6 +107,9 @@ POST_FAIT=1
 TEMP_PASS=$(python3 -c "import json;print(json.load(open('$TMP/creation.json'))['temporaryPassword'])" 2>/dev/null)
 [ -n "$TEMP_PASS" ] && CREE_EMAIL="$MDP_EMAIL"
 if [ -n "$TEMP_PASS" ]; then
+  # Format seul, jamais la valeur : alphabet sans I, O, l, 0, 1.
+  FORMAT=$(printf '%s' "$TEMP_PASS" | grep -Eq '^[A-HJ-NP-Za-km-z2-9]{12}$' && echo oui || echo non)
+  check "mot de passe temporaire : 12 caractères sans caractères ambigus" "$FORMAT" "oui"
   MUST=$(curl -s -X POST "$BASE/api/auth/login" -H 'Content-Type: application/json' -d "{\"email\":\"$MDP_EMAIL\",\"password\":\"$TEMP_PASS\"}" \
     | python3 -c "import sys,json;print(json.load(sys.stdin)['user'].get('mustChangePassword'))" 2>/dev/null)
   check "la connexion signale mustChangePassword" "$MUST" "True"
