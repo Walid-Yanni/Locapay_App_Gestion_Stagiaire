@@ -1,7 +1,7 @@
 // apps/web/src/lib/registre.ts
 // Logique pure du « Registre des stagiaires » : aucun appel réseau, aucun React.
 // Tout ce qui est calculé ici vient des données déjà chargées par l'API.
-import type { Activity, Report, Stagiaire } from "@locapay/shared-types";
+import type { Activity, ActivityStatus, Report, Stagiaire } from "@locapay/shared-types";
 
 /** Nombre de perles affichées dans la colonne « Parcours ». */
 export const BEADS = 10;
@@ -80,7 +80,12 @@ export function visaOf(s: Pick<Stagiaire, "status">, last?: Activity): Visa {
   if (s.status === "ANNULE") return { key: "annule", label: "Annulé" };
   if (s.status === "TERMINE") return { key: "termine", label: "Terminé" };
   if (!last) return { key: "vide", label: "Aucune entrée" };
-  switch (last.status) {
+  return activityVisa(last.status);
+}
+
+/** Vocabulaire d'interface d'un statut d'activité (DESIGN.md §6), partagé par le Registre et le Carnet. */
+export function activityVisa(status: ActivityStatus): Visa {
+  switch (status) {
     case "VALIDEE":
       return { key: "vise", label: "Visé" };
     case "SOUMISE":
