@@ -59,7 +59,19 @@ Points d'accès : `GET /health`, Swagger sur `/api/docs`, PDF d'un rapport sur `
 
 Contrôle de sécurité (API démarrée, développement uniquement) :
 `STAGIAIRE=<email d'un stagiaire du seed> bash scripts/check-securite.sh`
-(ex. `faridath.lawson@stagiaire.locapay.bj`). Le script crée un stagiaire de test qui reste en base.
+(ex. `faridath.lawson@stagiaire.locapay.bj`). Sections : 1. sans jeton → 401 ; 2. le stagiaire ne voit
+que ses données (liste, fiche, activité et signature d'un autre refusées) ; 3. le tuteur ne voit que ses
+stagiaires ; 4. stagiaire de test créé par la RH : format du mot de passe temporaire, `mustChangePassword`,
+blocage puis `change-password` ; 5. `GET /api/users/tutors` réservé aux RH, réponse limitée à id/prénom/nom ;
+6. aucun `password` / `passwordHash` dans les réponses. Le compte de test de la section 4 est supprimé à la
+sortie (même après échec ou Ctrl+C), **seulement si `BASE` est locale** ; sinon il est laissé et signalé.
+
+Nettoyage des comptes de test : `pnpm --filter @locapay/api exec tsx ../../scripts/nettoyer-comptes-test.ts`
+vise `test.mdp.*` et `test.dates.*` en `@stagiaire.locapay.bj`. **Simulation par défaut** ; `--email <adresse>`
+ne vise que ce compte ; `--confirmer` supprime réellement. Refus si la base de `DATABASE_URL` n'est pas locale
+ou si un compte protégé est dans la sélection. Comptes protégés (liste `PROTEGES`) : les 9 du seed et 5 comptes
+créés depuis l'interface (`livai0471@gmail.com`, `mougiraibine@gmail.com`, `Stagiaire2@gmail.com`,
+`Stagiaire3@gmail.com`, `Stagiairestest@gmail.com`).
 
 **Pièges connus (vérifiés) :**
 1. `apps/web` importe `@locapay/shared-types` depuis son `dist/`. Sans build préalable, le typecheck du web
@@ -87,8 +99,12 @@ Variables d'environnement : `DATABASE_URL`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, 
   `allowPendingPasswordChange`, utilisé par `POST /api/auth/change-password`). Mots de passe hachés avec bcrypt.
 - Démarrage : `server.ts` refuse de démarrer si `JWT_SECRET` ou `JWT_REFRESH_SECRET` est absent ou fait
   moins de 32 caractères.
-- Création de stagiaire : le tuteur doit exister, avoir le rôle `TUTEUR` et être actif (sinon 400). Le mot de
-  passe temporaire est généré côté serveur, renvoyé une seule fois, et le compte est créé avec `mustChangePassword`.
+- Création de stagiaire : le tuteur doit exister, avoir le rôle `TUTEUR` et être actif (sinon 400) ; date de fin
+  postérieure à la date de début (400, issue sur `endDate`) ; e-mail déjà utilisé → 409. Le mot de passe temporaire
+  est généré côté serveur (`lib/temporary-password.ts` : 12 caractères, `crypto.randomInt`, alphabet de 57 caractères
+  sans `I O l 0 1`), renvoyé une seule fois, et le compte est créé avec `mustChangePassword`.
+- `GET /api/users/tutors` : RH uniquement (`ADMIN_RH`, `RESPONSABLE_RH`), tuteurs actifs, champs `id`, `firstName`,
+  `lastName` seulement.
 - Rapports : `signReport` est atomique (`prisma.$transaction`), chaque rôle ne pose que son indicateur
   (`signedByTutor` / `signedByRH` / `signedByStagiaire`), statut `SIGNE` seulement quand les trois sont réunis.
   Le PDF renvoie 403 si l'accès est refusé, 404 si le rapport n'existe pas.
@@ -123,12 +139,22 @@ Enums à utiliser tels quels (ne pas inventer d'autres valeurs) :
 4. Pas de repli silencieux sur un secret par défaut : l'API refuse de démarrer sans `JWT_SECRET`
    et `JWT_REFRESH_SECRET` d'au moins 32 caractères. Ne réintroduis jamais de valeur par défaut.
 5. Les mots de passe ne sont jamais journalisés ni renvoyés après hachage ; un mot de passe temporaire
-   n'est montré qu'une seule fois.
+   n'est montré qu'une seule fois. Le client Prisma exclut `User.password` par défaut (`omit` global dans
+   `lib/prisma.ts`, relations comprises) ; seuls le login et `changePassword` (`auth.service.ts`) le réactivent
+   avec `omit: { password: false }`. Tout nouveau code qui doit lire le hash fait de même, explicitement.
 6. Les restrictions visibles dans l'interface (menus, boutons) ne remplacent jamais le contrôle serveur.
 
 ## 8. Frontend et identité visuelle
 
 - Les données viennent **uniquement de l'API** (`lib/api.ts`, hook `useApiResource`). Aucune donnée simulée.
+  `api()` lève une `ApiError` (`status`, et `issues` pour une 400 de validation Zod) : s'en servir pour afficher
+  les erreurs sous le champ concerné.
+- Dates de calendrier : `lib/dates.ts` (`todayLocal`, `addMonthsClamped`, `dayToIsoUtc`), format AAAA-MM-JJ, sans
+  `new Date(chaîne locale)` (décalage d'un jour).
+- `NouveauStagiaireModal` : création de stagiaire (tuteurs via `/api/users/tutors`, dates, niveau, erreurs par champ),
+  monté seulement à l'ouverture. `TemporaryPasswordDialog` : affiche le mot de passe temporaire une seule fois
+  (copie, piège à focus) ; **le fond ne ferme pas, Échap ne ferme qu'après une copie réussie**, le bouton
+  « J'ai transmis le mot de passe » ferme toujours ; le mot de passe n'est gardé que dans l'état React.
 - **Design « Carnet RH » : référence dans `DESIGN.md`** (couleurs, typographie, gabarit, écrans).
 - Composants existants à réutiliser : `Shell`, `Sidebar`, `PageHeader`, `KpiCard`, `DataTable`, `Badge`,
   `Registre` (`components/Registre.tsx` + `lib/registre.ts`). `Topbar.tsx` est conservé mais n'est plus rendu.
@@ -158,25 +184,30 @@ Vocabulaire d'interface (n'altère jamais les enums du backend, c'est une table 
 
 ## 9. État d'avancement
 
-Fait (vérifié au 12 oct. 2026) : monorepo, schéma Prisma et migration initiale, API en couches, auth JWT
+Fait (vérifié au 15 oct. 2026) : monorepo, schéma Prisma et migration initiale, API en couches, auth JWT
 par rôle **avec portée par utilisateur** (§7.1), changement de mot de passe obligatoire (API + écran web),
-mot de passe temporaire généré côté serveur, secrets JWT validés au démarrage, signature tripartite atomique,
-job de fin de cycle, PDF Puppeteer, Swagger, port DB aligné. Front : gabarit « Carnet RH » (tokens, Poppins,
-barre latérale avec logo réel, `PageHeader`, fond tramé, tiroir sous 900 px), Registre des stagiaires.
-Mobile minimal (journal d'activités).
+mot de passe temporaire généré côté serveur sans caractères ambigus, hash exclu de toutes les lectures,
+secrets JWT validés au démarrage, signature tripartite atomique, job de fin de cycle, PDF Puppeteer, Swagger,
+port DB aligné, scripts de contrôle et de nettoyage (§4). Front : gabarit « Carnet RH » (tokens, Poppins,
+barre latérale avec logo réel, `PageHeader`, fond tramé, tiroir sous 900 px), Registre des stagiaires,
+formulaire de création de stagiaire et dialogue du mot de passe temporaire. Mobile minimal (journal d'activités).
 
 À faire, dans cet ordre (vérifier dans le code avant de s'y mettre) :
-1. **Formulaire de création de stagiaire** : choix du tuteur, vraies dates, et mot de passe temporaire affiché
-   dans une fenêtre propre avec bouton « Copier » (aujourd'hui `window.alert`).
-2. **Carnet de stage** : fiche stagiaire en double page (DESIGN.md §5).
-3. **Suivi du jour** avec `StampButton` (appui long pour viser, branché sur `PATCH /api/activities/:id/review`).
-4. **[Sécurité] Limitation des tentatives de connexion** (`express-rate-limit`), **avant toute mise en ligne**.
-5. Libellé de la barre latérale selon le rôle (« CARNET RH » ou « CARNET DE STAGE »).
-6. Remise à zéro propre des comptes de test créés par `scripts/check-securite.sh`.
-7. Décision sur le champ « Lieu », absent du modèle (DESIGN.md §8).
-8. Tests automatisés.
+1. **Carnet de stage** : fiche stagiaire en double page (DESIGN.md §5).
+2. **Suivi du jour** avec cachet à maintenir (`StampButton`, appui long pour viser, branché sur
+   `PATCH /api/activities/:id/review`).
+3. **[Sécurité] Limitation des tentatives de connexion** (`express-rate-limit`), **obligatoire avant la mise en ligne**.
+4. Libellé de la barre latérale selon le rôle (« CARNET RH » ou « CARNET DE STAGE »).
+5. Décisions produit en attente : champ « Lieu », absent du modèle (DESIGN.md §8) ; qui saisit les activités
+   dans Suivi du jour ; grille d'évaluation (§6).
+6. Tests automatisés.
+7. Comptes gmail de test (protégés dans `nettoyer-comptes-test.ts`) à trier.
+8. Modal de création : un clic sur le fond ferme et perd la saisie (à durcir).
+9. Secrets et comptes du seed (mot de passe commun) à remplacer avant la production.
+10. Fixer le fuseau du job de fin de cycle (timezone Africa/Porto-Novo dans la planification) avant la production :
+    sur un serveur en UTC, 02:00 UTC = 03:00 au Bénin.
 
-À trancher avant d'y toucher : la **grille d'évaluation** (§6). Plus tard : versions mobile des écrans
+Plus tard : versions mobile des écrans
 « Carnet RH », SSO LOCAPAY, synchro des employés, stockage S3 des documents, notifications push (FCM).
 
 ## 10. Définition de « terminé »
