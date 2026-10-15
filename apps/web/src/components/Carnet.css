@@ -98,6 +98,98 @@
 /* ---------- Page droite ---------- */
 .carnet-titre-section { margin: 0 0 8px; font-size: 18px; font-weight: 600; }
 
+/* ---------- Texte réservé aux lecteurs d'écran ---------- */
+.carnet .carnet-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.carnet-sous-titre { margin: 0; font-size: 16px; font-weight: 600; }
+
+/* ---------- Le fil du stage ---------- */
+.carnet-fil {
+  margin-top: 28px;
+  padding: 20px 22px;
+  background: var(--lp-green-pale);
+  border-radius: 16px;
+}
+.carnet-fil__tete {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+  margin-bottom: 16px;
+}
+.carnet-fil__etape { color: var(--lp-green-text); font-size: 13px; font-weight: 500; }
+.carnet-fil__perles {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.carnet-fil__texte { margin: 16px 0 0; color: var(--lp-muted); font-size: 13px; line-height: 1.6; }
+
+/* Perles : la taille donne le palier, la forme distingue les états (plein, pointillé, contour, anneau). */
+.carnet-perle {
+  position: relative;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--lp-green);
+  border: 1.5px solid var(--lp-green);
+}
+.carnet-perle.is-i0 { width: 10px; height: 10px; background: transparent; border: 1.5px dashed var(--lp-muted); }
+.carnet-perle.is-i1 { width: 12px; height: 12px; }
+.carnet-perle.is-i2 { width: 18px; height: 18px; }
+.carnet-perle.is-i3 { width: 24px; height: 24px; }
+.carnet-perle.is-future { width: 10px; height: 10px; background: transparent; border: 1.5px solid var(--lp-muted); }
+/* Semaine en cours : perle encre cerclée, au moins de taille moyenne pour rester repérable. */
+.carnet-perle.is-courante {
+  background: var(--lp-ink);
+  border: 1.5px solid var(--lp-ink);
+  box-shadow: 0 0 0 2px var(--lp-green-pale), 0 0 0 3.5px var(--lp-ink);
+}
+.carnet-perle.is-courante.is-i0,
+.carnet-perle.is-courante.is-i1 { width: 18px; height: 18px; }
+
+.carnet-fil__legende {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--lp-muted);
+  font-size: 12px;
+}
+.carnet-fil__legende li { display: inline-flex; align-items: center; gap: 6px; }
+
+/* ---------- Compétences ---------- */
+.carnet-competences { margin-top: 24px; }
+.carnet-competences .carnet-sous-titre { margin-bottom: 10px; }
+.carnet-puces { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.carnet-puce {
+  padding: 6px 14px;
+  border: 1.5px solid var(--lp-ink);
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
 /* ---------- Une seule colonne sous 900 px ---------- */
 @media (max-width: 900px) {
   .carnet-book { grid-template-columns: minmax(0, 1fr); }

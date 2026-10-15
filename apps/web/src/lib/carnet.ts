@@ -144,6 +144,38 @@ export function filDuStage(
   };
 }
 
+/** Libellé de chaque palier, pour que le fil se lise sans la taille ni la couleur. */
+export const INTENSITE_LABELS: Record<Intensite, string> = {
+  0: "aucun travail visé",
+  1: "activité légère",
+  2: "activité soutenue",
+  3: "activité intense",
+};
+
+/** Libellé de l'encadré : « Semaine 3 / 12 », « Commence le … », « Terminé · 12 semaines »… jamais « Semaine 0 ». */
+export function libelleEtapeFil(fil: FilDuStage, startDate: string): string {
+  switch (fil.phase) {
+    case "en_cours":
+      return `Semaine ${fil.courante} / ${fil.total}`;
+    case "avant":
+      return `Commence le ${formatDay(isoDay(startDate))}`;
+    case "termine":
+      return `Terminé · ${fil.total} ${fil.total > 1 ? "semaines" : "semaine"}`;
+    case "annule":
+      return "Stage annulé";
+    default:
+      return "Période incohérente";
+  }
+}
+
+/** Texte accessible d'une perle, ex. « Semaine 3 : activité soutenue, 12 h visées ». */
+export function libelleSemaine(s: SemaineFil): string {
+  if (s.etat === "future") return `Semaine ${s.numero} : à venir`;
+  const enCours = s.etat === "courante" ? ", en cours" : "";
+  const detail = s.minutes > 0 ? `${INTENSITE_LABELS[s.intensite]}, ${libelleDuree(s.minutes)} visées` : INTENSITE_LABELS[0];
+  return `Semaine ${s.numero}${enCours} : ${detail}`;
+}
+
 // ---------- Libellés ----------
 
 /** Jour en toutes lettres, sans décalage de fuseau, ex. « 1 juillet 2026 ». */

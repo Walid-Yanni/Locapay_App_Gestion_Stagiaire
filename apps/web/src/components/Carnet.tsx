@@ -1,9 +1,19 @@
 // apps/web/src/components/Carnet.tsx
 // « Carnet de stage » : fiche d'un stagiaire en double page (DESIGN.md §5).
 // Les droits sont imposés par l'API : hors de sa portée, GET /api/stagiaires/:id répond 404.
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api, ApiError } from "../lib/api";
-import { libellePeriode, type StagiaireDetail } from "../lib/carnet";
+import {
+  filDuStage,
+  INTENSITE_LABELS,
+  libelleEtapeFil,
+  libellePeriode,
+  libelleSemaine,
+  type Intensite,
+  type SemaineFil,
+  type StagiaireDetail,
+} from "../lib/carnet";
+import { todayLocal } from "../lib/dates";
 import { initialsOf } from "../lib/registre";
 import { PageHeader } from "./PageHeader";
 import "./Carnet.css";
@@ -128,6 +138,9 @@ function CarnetPages({ stagiaire: s }: { stagiaire: StagiaireDetail }) {
             <dd>{s.service}</dd>
           </div>
         </dl>
+
+        <FilDuStageEncadre stagiaire={s} />
+        <Competences skills={s.skills} />
       </section>
 
       <section className="carnet-page carnet-page--droite" aria-labelledby="carnet-journal-titre">
@@ -141,5 +154,86 @@ function CarnetPages({ stagiaire: s }: { stagiaire: StagiaireDetail }) {
         </p>
       </section>
     </div>
+  );
+}
+
+/** Classe d'une perle : la forme et la taille portent l'information, la couleur ne fait que la doubler. */
+function classePerle(semaine: SemaineFil): string {
+  if (semaine.etat === "future") return "carnet-perle is-future";
+  const base = `carnet-perle is-i${semaine.intensite}`;
+  return semaine.etat === "courante" ? `${base} is-courante` : base;
+}
+
+function FilDuStageEncadre({ stagiaire: s }: { stagiaire: StagiaireDetail }) {
+  const fil = useMemo(() => filDuStage(s, s.activities, todayLocal()), [s]);
+  const etape = libelleEtapeFil(fil, s.startDate);
+
+  return (
+    <section className="carnet-fil" aria-labelledby="carnet-fil-titre">
+      <header className="carnet-fil__tete">
+        <h3 id="carnet-fil-titre" className="carnet-sous-titre">
+          Le fil du stage
+        </h3>
+        <span className="carnet-fil__etape">{etape}</span>
+      </header>
+
+      {fil.semaines.length > 0 && (
+        <ol className="carnet-fil__perles">
+          {fil.semaines.map((semaine) => {
+            const libelle = libelleSemaine(semaine);
+            return (
+              <li key={semaine.numero} className={classePerle(semaine)} title={libelle}>
+                <span className="carnet-sr">{libelle}</span>
+              </li>
+            );
+          })}
+        </ol>
+      )}
+
+      <p className="carnet-fil__texte">
+        {fil.phase === "incoherent"
+          ? "La date de fin précède la date de début : le fil ne peut pas être tracé."
+          : "Chaque perle est une semaine : sa taille raconte l'intensité du travail visé."}
+        {fil.phase === "en_cours" && " La perle sombre marque la semaine en cours."}
+        {fil.phase !== "incoherent" &&
+          ` ${fil.semainesAvecTravail} ${fil.semainesAvecTravail > 1 ? "semaines" : "semaine"} avec du travail visé sur ${fil.total}.`}
+      </p>
+
+      {fil.semaines.length > 0 && (
+        <ul className="carnet-fil__legende" aria-label="Légende des perles">
+          {([0, 1, 2, 3] as Intensite[]).map((i) => (
+            <li key={i}>
+              <span className={`carnet-perle is-i${i}`} aria-hidden="true" />
+              {i === 0 ? "aucun" : i === 1 ? "moins de 8 h" : i === 2 ? "8 à 20 h" : "20 h et plus"}
+              <span className="carnet-sr"> : {INTENSITE_LABELS[i]}</span>
+            </li>
+          ))}
+          <li>
+            <span className="carnet-perle is-future" aria-hidden="true" />à venir
+          </li>
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function Competences({ skills }: { skills: StagiaireDetail["skills"] }) {
+  return (
+    <section className="carnet-competences" aria-labelledby="carnet-competences-titre">
+      <h3 id="carnet-competences-titre" className="carnet-sous-titre">
+        Compétences
+      </h3>
+      {skills.length === 0 ? (
+        <p className="carnet-muted">Aucune compétence enregistrée.</p>
+      ) : (
+        <ul className="carnet-puces">
+          {skills.map((k) => (
+            <li key={k.id} className="carnet-puce">
+              {k.skill?.name ?? "Compétence sans nom"}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
