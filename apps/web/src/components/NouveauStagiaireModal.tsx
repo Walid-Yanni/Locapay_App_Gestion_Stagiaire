@@ -5,6 +5,7 @@ import React, { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { api, ApiError } from "../lib/api";
 import { addMonthsClamped, dayToIsoUtc, todayLocal } from "../lib/dates";
+import type { CreatedAccount } from "./TemporaryPasswordDialog";
 import "./NouveauStagiaireModal.css";
 
 interface Tutor {
@@ -82,7 +83,7 @@ export function NouveauStagiaireModal({
   onCreated,
 }: {
   onClose: () => void;
-  onCreated: (temporaryPassword: string) => void;
+  onCreated: (account: CreatedAccount) => void;
 }) {
   const [form, setForm] = useState(initialForm);
   const [endEdited, setEndEdited] = useState(false);
@@ -153,7 +154,11 @@ export function NouveauStagiaireModal({
           endDate: dayToIsoUtc(form.endDate),
         }),
       });
-      onCreated(result.temporaryPassword);
+      onCreated({
+        fullName: `${form.firstName.trim()} ${form.lastName.trim()}`,
+        email: form.email.trim(),
+        temporaryPassword: result.temporaryPassword,
+      });
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
         setFieldErrors({ email: "Un compte existe déjà avec cette adresse e-mail." });

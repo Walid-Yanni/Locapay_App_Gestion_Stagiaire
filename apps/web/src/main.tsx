@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   Activity as ActivityIcon,
@@ -26,6 +26,7 @@ import { NouveauStagiaireModal } from "./components/NouveauStagiaireModal";
 import { PageHeader, todayLabel } from "./components/PageHeader";
 import { RegistreStats, RegistreTable } from "./components/Registre";
 import { Shell } from "./components/Shell";
+import { TemporaryPasswordDialog, type CreatedAccount } from "./components/TemporaryPasswordDialog";
 import { useApiResource } from "./hooks/useApiResource";
 import { api, downloadReportPdf, login, type Session } from "./lib/api";
 import { registreStats } from "./lib/registre";
@@ -222,6 +223,8 @@ function StagiairesView({
   const [showModal, setShowModal] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
+  const [createdAccount, setCreatedAccount] = useState<CreatedAccount | null>(null);
+  const newButtonRef = useRef<HTMLButtonElement>(null);
   const filtered = stagiaires.filter((s) => {
     const matchesSearch =
       `${s.user?.firstName} ${s.user?.lastName} ${s.school} ${s.subject}`
@@ -231,10 +234,16 @@ function StagiairesView({
     return matchesSearch && matchesStatus;
   });
 
-  function handleCreated(temporaryPassword: string) {
+  function handleCreated(account: CreatedAccount) {
     setShowModal(false);
     reload();
-    window.alert(`Compte créé. Mot de passe temporaire : ${temporaryPassword}\n\nTransmettez-le au stagiaire maintenant : il ne sera plus jamais affiché.`);
+    setCreatedAccount(account);
+  }
+
+  function closePasswordDialog() {
+    // Le mot de passe quitte l'état React dès la fermeture.
+    setCreatedAccount(null);
+    newButtonRef.current?.focus();
   }
 
   return (
@@ -244,7 +253,7 @@ function StagiairesView({
       title="Registre des stagiaires"
       action={
         canCreate && (
-          <button className="pill-button" onClick={() => setShowModal(true)}>
+          <button ref={newButtonRef} className="pill-button" onClick={() => setShowModal(true)}>
             <Plus size={16} /> Nouveau stagiaire
           </button>
         )
@@ -274,6 +283,9 @@ function StagiairesView({
 
       {canCreate && showModal && (
         <NouveauStagiaireModal onClose={() => setShowModal(false)} onCreated={handleCreated} />
+      )}
+      {createdAccount && (
+        <TemporaryPasswordDialog account={createdAccount} onClose={closePasswordDialog} />
       )}
     </section>
     </>
