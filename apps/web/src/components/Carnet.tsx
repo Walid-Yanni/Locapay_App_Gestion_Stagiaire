@@ -1,12 +1,16 @@
 // apps/web/src/components/Carnet.tsx
 // « Carnet de stage » : fiche d'un stagiaire en double page (DESIGN.md §5).
 // Les droits sont imposés par l'API : hors de sa portée, GET /api/stagiaires/:id répond 404.
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { api, ApiError } from "../lib/api";
 import {
+  CATEGORY_LABELS,
   filDuStage,
   INTENSITE_LABELS,
+  isoDay,
+  libelleDuree,
   libelleEtapeFil,
+  libelleJour,
   libellePeriode,
   libelleSemaine,
   type Intensite,
@@ -14,7 +18,7 @@ import {
   type StagiaireDetail,
 } from "../lib/carnet";
 import { todayLocal } from "../lib/dates";
-import { initialsOf } from "../lib/registre";
+import { activityVisa, initialsOf, type VisaKey } from "../lib/registre";
 import { PageHeader } from "./PageHeader";
 import "./Carnet.css";
 
@@ -103,7 +107,6 @@ function CarnetPages({ stagiaire: s }: { stagiaire: StagiaireDetail }) {
   const fullName = `${s.user?.firstName ?? ""} ${s.user?.lastName ?? ""}`.trim() || "Sans nom";
   const cursus = [s.school, s.level, s.fieldOfStudy].filter(Boolean).join(" · ");
   const tuteur = s.tutor ? `${s.tutor.firstName} ${s.tutor.lastName}` : "Non renseigné";
-  const nbEntrees = s.activities.length;
 
   return (
     <div className="carnet-book">
@@ -147,11 +150,7 @@ function CarnetPages({ stagiaire: s }: { stagiaire: StagiaireDetail }) {
         <h2 id="carnet-journal-titre" className="carnet-titre-section">
           Journal d'activités
         </h2>
-        <p className="carnet-muted">
-          {nbEntrees === 0
-            ? "Aucune entrée au journal pour l'instant."
-            : `${nbEntrees} ${nbEntrees > 1 ? "entrées" : "entrée"} au journal.`}
-        </p>
+        <Journal activities={s.activities} />
       </section>
     </div>
   );
@@ -235,5 +234,93 @@ function Competences({ skills }: { skills: StagiaireDetail["skills"] }) {
         </ul>
       )}
     </section>
+  );
+}
+
+/** Nombre d'entrées affichées au départ, puis à chaque « Afficher les entrées plus anciennes ». */
+const JOURNAL_PAQUET = 20;
+
+/** Marqueurs de la frise (DESIGN.md §6) : la forme porte le statut, le libellé l'accompagne toujours. */
+const LEGENDE: { key: VisaKey; label: string }[] = [
+  { key: "vise", label: "Visé" },
+  { key: "attente", label: "En attente" },
+  { key: "revoir", label: "À revoir" },
+  { key: "brouillon", label: "Brouillon" },
+];
+
+function Journal({ activities }: { activities: StagiaireDetail["activities"] }) {
+  const [visibles, setVisibles] = useState(JOURNAL_PAQUET);
+  const today = todayLocal();
+  // Du plus récent au plus ancien ; à jour égal, la dernière saisie d'abord.
+  const triees = useMemo(
+    () =>
+      [...activities].sort(
+        (a, b) => b.date.localeCompare(a.date) || (b.createdAt ?? "").localeCompare(a.createdAt ?? ""),
+      ),
+    [activities],
+  );
+
+  if (triees.length === 0) {
+    return <p className="carnet-muted">Aucune entrée au journal pour l'instant.</p>;
+  }
+
+  const affichees = triees.slice(0, visibles);
+  const restantes = triees.length - affichees.length;
+
+  return (
+    <>
+      <ul className="carnet-legende" aria-label="Légende des marqueurs">
+        {LEGENDE.map((item) => (
+          <li key={item.key}>
+            <span className={`carnet-marqueur carnet-marqueur--${item.key}`} aria-hidden="true" />
+            {item.label}
+          </li>
+        ))}
+      </ul>
+
+      <ol className="carnet-frise">
+        {affichees.map((a, index) => {
+          const visa = activityVisa(a.status);
+          return (
+            <li
+              key={a.id}
+              className={`carnet-entree carnet-entree--${visa.key}`}
+              style={{ "--i": index % JOURNAL_PAQUET } as CSSProperties}
+            >
+              <span className={`carnet-marqueur carnet-marqueur--${visa.key}`} aria-hidden="true" />
+              <div className="carnet-entree__corps">
+                <p className="carnet-entree__meta">
+                  <span className="carnet-entree__jour">{libelleJour(isoDay(a.date), today)}</span>
+                  <span className={`carnet-cachet carnet-cachet--${visa.key}`}>{visa.label}</span>
+                </p>
+                <p className="carnet-entree__texte">{a.description}</p>
+                <p className="carnet-entree__detail">
+                  {CATEGORY_LABELS[a.category]} · {libelleDuree(a.durationMinutes)}
+                </p>
+                {a.status === "REJETEE" && a.tutorComment && (
+                  <p className="carnet-entree__commentaire">
+                    <span className="carnet-entree__commentaire-titre">Commentaire du tuteur : </span>
+                    {a.tutorComment}
+                  </p>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+
+      <p className="carnet-journal__compte" role="status">
+        {affichees.length} {affichees.length > 1 ? "entrées affichées" : "entrée affichée"} sur {triees.length}
+      </p>
+      {restantes > 0 && (
+        <button
+          type="button"
+          className="carnet-journal__plus"
+          onClick={() => setVisibles((n) => n + JOURNAL_PAQUET)}
+        >
+          Afficher les entrées plus anciennes
+        </button>
+      )}
+    </>
   );
 }

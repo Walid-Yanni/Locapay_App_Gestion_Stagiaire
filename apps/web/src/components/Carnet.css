@@ -190,6 +190,142 @@
   line-height: 1.4;
 }
 
+/* ---------- Journal d'activités ---------- */
+/* Marqueurs (DESIGN.md §6) : disque plein coché, cercle pointillé, barre oblique, pointillé gris. */
+.carnet-marqueur {
+  position: relative;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--lp-page);
+}
+.carnet-marqueur--vise { background: var(--lp-green); }
+.carnet-marqueur--vise::after {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 3px;
+  width: 4px;
+  height: 7px;
+  border-right: 2px solid var(--lp-on-green);
+  border-bottom: 2px solid var(--lp-on-green);
+  transform: rotate(45deg);
+}
+.carnet-marqueur--attente { border: 1.5px dashed var(--lp-ink); }
+.carnet-marqueur--revoir { border-radius: 0; background: transparent; }
+.carnet-marqueur--revoir::before {
+  content: "";
+  position: absolute;
+  left: 7px;
+  top: -2px;
+  width: 2px;
+  height: 20px;
+  border-radius: 1px;
+  background: var(--lp-ink);
+  transform: rotate(45deg);
+}
+.carnet-marqueur--brouillon { border: 1.5px dotted var(--lp-muted); }
+
+.carnet-legende {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin: 10px 0 20px;
+  padding: 0;
+  list-style: none;
+  color: var(--lp-muted);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.carnet-legende li { display: inline-flex; align-items: center; gap: 8px; }
+
+/* Frise : un filet vertical relie les marqueurs. */
+.carnet-frise { position: relative; margin: 0; padding: 0; list-style: none; }
+.carnet-frise::before {
+  content: "";
+  position: absolute;
+  left: 7.5px;
+  top: 8px;
+  bottom: 8px;
+  width: 1px;
+  background: var(--lp-line);
+}
+.carnet-entree {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+  padding: 0 0 22px;
+  animation: carnet-apparition 0.35s ease both;
+  animation-delay: calc(var(--i, 0) * 45ms);
+}
+.carnet-entree > .carnet-marqueur { margin-top: 2px; }
+.carnet-entree__corps { min-width: 0; }
+.carnet-entree__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin: 0 0 4px; }
+.carnet-entree__jour {
+  color: var(--lp-green-text);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.carnet-entree__texte { margin: 0; font-size: 15px; font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; }
+.carnet-entree--revoir .carnet-entree__texte { color: var(--lp-muted); }
+.carnet-entree__detail { margin: 2px 0 0; color: var(--lp-muted); font-size: 13px; }
+.carnet-entree__commentaire {
+  margin: 8px 0 0;
+  padding: 8px 12px;
+  border-left: 2px solid var(--lp-ink);
+  background: var(--lp-card);
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.carnet-entree__commentaire-titre { font-weight: 600; }
+
+/* Cachet texte : double le marqueur par un libellé, sans le trio rouge-orange-vert. */
+.carnet-cachet {
+  padding: 1px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.carnet-cachet--vise { background: var(--lp-green); color: var(--lp-on-green); }
+.carnet-cachet--attente { border: 1px dashed var(--lp-ink); color: var(--lp-ink); }
+.carnet-cachet--revoir { border: 1.5px solid var(--lp-ink); color: var(--lp-ink); }
+.carnet-cachet--brouillon { border: 1px dotted var(--lp-muted); color: var(--lp-muted); }
+
+.carnet-journal__compte { margin: 4px 0 0; color: var(--lp-muted); font-size: 12px; }
+.carnet-journal__plus {
+  margin-top: 12px;
+  min-height: 40px;
+  padding: 8px 18px;
+  border: 1.5px solid var(--lp-ink);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--lp-ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.carnet-journal__plus:hover { background: var(--lp-green-pale); }
+.carnet-journal__plus:focus-visible { outline: 2px solid var(--lp-ink); outline-offset: 2px; }
+
+@keyframes carnet-apparition {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .carnet-entree { animation: none; }
+}
+
 /* ---------- Une seule colonne sous 900 px ---------- */
 @media (max-width: 900px) {
   .carnet-book { grid-template-columns: minmax(0, 1fr); }
