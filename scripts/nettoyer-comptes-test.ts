@@ -6,6 +6,7 @@
 // DATABASE_URL est lu par le client Prisma depuis apps/api/.env. Refus si la base n'est pas locale.
 // Codes de sortie : 0 succès, 1 refus ou erreur, 3 compte visé par --email introuvable.
 import { Prisma, PrismaClient } from "@prisma/client";
+import { Refus, verifierBaseLocale } from "./base-locale.js";
 
 const DOMAINE = "@stagiaire.locapay.bj";
 const PREFIXES = ["test.mdp.", "test.dates."];
@@ -28,10 +29,7 @@ const PROTEGES = [
   "Stagiairestest@gmail.com",
 ].map((email) => email.toLowerCase());
 
-const HOTES_LOCAUX = ["localhost", "127.0.0.1", "::1"];
 const INTROUVABLE = 3;
-
-class Refus extends Error {}
 
 function lireArguments(argv: string[]) {
   const confirmer = argv.includes("--confirmer");
@@ -44,21 +42,6 @@ function lireArguments(argv: string[]) {
     throw new Refus(`Arrêt : ${email} ne correspond pas à ${PREFIXES.map((p) => p + "*" + DOMAINE).join(" ou ")}.`);
   }
   return { confirmer, email };
-}
-
-// N'affiche jamais l'URL ni ses identifiants : seulement l'hôte quand il est refusé.
-function verifierBaseLocale() {
-  const url = process.env.DATABASE_URL;
-  if (!url) throw new Refus("Arrêt : DATABASE_URL est absent, impossible de vérifier que la base est locale.");
-  let hote: string;
-  try {
-    hote = new URL(url).hostname.replace(/^\[(.*)\]$/, "$1").toLowerCase();
-  } catch {
-    throw new Refus("Arrêt : DATABASE_URL n'est pas une URL lisible, impossible de vérifier que la base est locale.");
-  }
-  if (!HOTES_LOCAUX.includes(hote)) {
-    throw new Refus(`Arrêt : la base visée n'est pas locale (hôte « ${hote || "vide"} »). Ce script ne s'utilise que sur une base de développement locale.`);
-  }
 }
 
 const prisma = new PrismaClient();
