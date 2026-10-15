@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   Activity as ActivityIcon,
@@ -20,6 +20,7 @@ import type {
   UserRole,
 } from "@locapay/shared-types";
 import { Badge } from "./components/Badge";
+import { CarnetView } from "./components/Carnet";
 import { DataTable } from "./components/DataTable";
 import { KpiCard } from "./components/KpiCard";
 import { NouveauStagiaireModal } from "./components/NouveauStagiaireModal";
@@ -29,6 +30,7 @@ import { Shell } from "./components/Shell";
 import { TemporaryPasswordDialog, type CreatedAccount } from "./components/TemporaryPasswordDialog";
 import { useApiResource } from "./hooks/useApiResource";
 import { api, downloadReportPdf, login, type Session } from "./lib/api";
+import { carnetHash, parseCarnetHash } from "./lib/carnet";
 import { registreStats } from "./lib/registre";
 import { ChangePasswordScreen } from "./pages/ChangePasswordScreen";
 import "./styles.css";
@@ -213,12 +215,14 @@ function StagiairesView({
   reports,
   reload,
   canCreate,
+  onOpen,
 }: {
   stagiaires: Stagiaire[];
   activities: ActivityType[];
   reports: Report[];
   reload: () => void;
   canCreate: boolean;
+  onOpen: (stagiaire: Stagiaire) => void;
 }) {
   const [showModal, setShowModal] = useState(false);
   const [search, setSearch] = useState("");
@@ -278,7 +282,7 @@ function StagiairesView({
 
       <div className="registre">
         <RegistreStats stats={registreStats(stagiaires, activities, reports)} />
-        <RegistreTable stagiaires={filtered} activities={activities} />
+        <RegistreTable stagiaires={filtered} activities={activities} onOpen={onOpen} />
       </div>
 
       {canCreate && showModal && (
@@ -834,6 +838,13 @@ function NotificationsView({
   );
 }
 
+/** Retire le hash de l'URL sans recharger. « push » garde une entrée d'historique (retour possible vers le carnet). */
+function clearHash(mode: "push" | "replace") {
+  const url = window.location.pathname + window.location.search;
+  if (mode === "push") window.history.pushState(null, "", url);
+  else window.history.replaceState(null, "", url);
+}
+
 function App() {
   const storedUser = localStorage.getItem("user");
   const storedToken = localStorage.getItem("accessToken");
@@ -848,6 +859,8 @@ function App() {
   );
   function handleLogout() {
     localStorage.clear();
+    // Un carnet ouvert ne doit pas être rouvert à la connexion suivante.
+    clearHash("replace");
     setSession(null);
   }
 
@@ -871,7 +884,51 @@ function App() {
 }
 
 function Workspace({ session, onLogout }: { session: Session; onLogout: () => void }) {
-  const [view, setView] = useState("dashboard");
+  const role = session.user.role as UserRole;
+  // Vue d'accueil d'un carnet fermé : le Registre, sauf pour le stagiaire qui n'y a pas accès.
+  const homeView = role === "STAGIAIRE" ? "dashboard" : "stagiaires";
+
+  // Le hash n'est lu qu'ici : Workspace n'est monté qu'une fois la session établie.
+  const [initialHash] = useState(() => parseCarnetHash(window.location.hash));
+  const [carnetId, setCarnetId] = useState<string | null>(
+    initialHash.kind === "carnet" ? initialHash.id : null,
+  );
+  const [view, setView] = useState(
+    initialHash.kind === "carnet" ? "carnet" : initialHash.kind === "invalide" ? homeView : "dashboard",
+  );
+
+  useEffect(() => {
+    if (initialHash.kind === "invalide") clearHash("replace");
+  }, [initialHash]);
+
+  // Boutons « retour » / « suivant » du navigateur, ou hash modifié à la main.
+  useEffect(() => {
+    function onPopState() {
+      const hash = parseCarnetHash(window.location.hash);
+      if (hash.kind === "carnet") {
+        setCarnetId(hash.id);
+        setView("carnet");
+        return;
+      }
+      if (hash.kind === "invalide") clearHash("replace");
+      setCarnetId(null);
+      setView((current) => (current === "carnet" || hash.kind === "invalide" ? homeView : current));
+    }
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [homeView]);
+
+  function openCarnet(stagiaire: Stagiaire) {
+    window.history.pushState(null, "", carnetHash(stagiaire.id));
+    setCarnetId(stagiaire.id);
+    setView("carnet");
+  }
+
+  function navigate(next: string) {
+    if (view === "carnet") clearHash("push");
+    setCarnetId(null);
+    setView(next);
+  }
 
   const stagiaires = useApiResource<Stagiaire[]>("/api/stagiaires", []);
   const activities = useApiResource<ActivityType[]>("/api/activities", []);
@@ -891,7 +948,6 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
     reports.loading &&
     notifications.loading;
 
-  const role = session.user.role as UserRole;
   const canManageStagiaires = role === "ADMIN_RH" || role === "RESPONSABLE_RH";
   const canEvaluate = role === "TUTEUR" || role === "ADMIN_RH" || role === "RESPONSABLE_RH";
 
@@ -902,8 +958,8 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
         lastName: session.user.lastName,
         role,
       }}
-      view={view}
-      onView={setView}
+      view={view === "carnet" ? homeView : view}
+      onView={navigate}
       onLogout={onLogout}
       unreadCount={unreadNotificationsCount}
     >
@@ -926,6 +982,15 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
               reports={reports.data}
               reload={stagiaires.reload}
               canCreate={canManageStagiaires}
+              onOpen={openCarnet}
+            />
+          )}
+          {view === "carnet" && carnetId && (
+            <CarnetView
+              key={carnetId}
+              stagiaireId={carnetId}
+              onBack={() => navigate(homeView)}
+              backLabel={homeView === "stagiaires" ? "Retour au registre" : "Retour au tableau de bord"}
             />
           )}
           {view === "activities" && (

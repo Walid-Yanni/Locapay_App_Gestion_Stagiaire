@@ -1,0 +1,112 @@
+/* apps/web/src/components/Carnet.css
+   Tous les styles sont portés par la classe .carnet : rien ne fuit sur les autres écrans.
+   Couleurs et police uniquement via les tokens --lp-* (tokens.css). */
+
+.carnet {
+  font-family: var(--lp-font);
+  color: var(--lp-ink);
+}
+
+/* ---------- Retour au registre ---------- */
+.carnet-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--lp-green-text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+/* Chevron dessiné en CSS (pas de bibliothèque d'icônes). */
+.carnet-back::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-left: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg);
+}
+.carnet-back:hover { text-decoration: underline; }
+.carnet-back:focus-visible { outline: 2px solid var(--lp-ink); outline-offset: 3px; border-radius: 4px; }
+
+/* ---------- États : chargement, introuvable, erreur ---------- */
+.carnet-state {
+  margin: 0;
+  padding: 24px;
+  background: var(--lp-card);
+  border: 1px solid var(--lp-line);
+  border-radius: 16px;
+}
+.carnet-state__title { margin: 0 0 8px; font-weight: 600; }
+.carnet-state .pill-button { margin-top: 12px; }
+.carnet-muted { margin: 0; color: var(--lp-muted); font-size: 14px; }
+
+/* ---------- Double page ---------- */
+.carnet-book {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  background: var(--lp-card);
+  border: 1px solid var(--lp-line);
+  border-radius: 20px;
+  box-shadow: 0 24px 48px -32px color-mix(in srgb, var(--lp-ink) 40%, transparent);
+  overflow: hidden;
+}
+.carnet-page { min-width: 0; padding: 36px 40px; }
+/* Pli central : la page droite porte une ombre intérieure côté reliure. */
+.carnet-page--droite {
+  background: var(--lp-page);
+  border-left: 1px solid var(--lp-line);
+  box-shadow: inset 16px 0 18px -18px color-mix(in srgb, var(--lp-ink) 35%, transparent);
+}
+
+/* ---------- Identité ---------- */
+.carnet-identite { display: flex; align-items: center; gap: 20px; margin-bottom: 24px; }
+.carnet-identite__texte { min-width: 0; }
+.carnet-avatar {
+  width: 72px;
+  height: 72px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 18px;
+  background: var(--lp-green);
+  color: var(--lp-on-green);
+  font-size: 24px;
+  font-weight: 600;
+}
+.carnet-nom { margin: 0; font-size: 30px; font-weight: 600; line-height: 1.15; overflow-wrap: anywhere; }
+.carnet-cursus { margin: 6px 0 0; color: var(--lp-muted); font-size: 14px; }
+
+/* ---------- Fiche (Période, Tuteur, Objectif, Service) ---------- */
+.carnet-fiche { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; margin: 0; }
+.carnet-champ { min-width: 0; padding: 14px 0; border-bottom: 1px dashed var(--lp-line); }
+.carnet-champ dt {
+  margin-bottom: 6px;
+  color: var(--lp-muted);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.carnet-champ dd { margin: 0; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
+
+/* ---------- Page droite ---------- */
+.carnet-titre-section { margin: 0 0 8px; font-size: 18px; font-weight: 600; }
+
+/* ---------- Une seule colonne sous 900 px ---------- */
+@media (max-width: 900px) {
+  .carnet-book { grid-template-columns: minmax(0, 1fr); }
+  .carnet-page { padding: 24px 20px; }
+  .carnet-page--droite { border-left: 0; border-top: 1px solid var(--lp-line); box-shadow: none; }
+}
+@media (max-width: 480px) {
+  .carnet-fiche { grid-template-columns: minmax(0, 1fr); }
+  .carnet-identite { gap: 14px; }
+  .carnet-avatar { width: 56px; height: 56px; border-radius: 14px; font-size: 20px; }
+  .carnet-nom { font-size: 24px; }
+}

@@ -35,6 +35,24 @@ function dayNumber(day: string): number | null {
   return Math.floor(Date.UTC(Number(y), Number(m) - 1, Number(d)) / DAY_MS);
 }
 
+// ---------- Adresse du carnet (#carnet/<id>) ----------
+
+/** Forme des identifiants Prisma (cuid) : « c » suivi de 24 caractères minuscules ou chiffres. */
+const STAGIAIRE_ID_PATTERN = /^c[a-z0-9]{24}$/;
+
+export type CarnetHash = { kind: "aucun" } | { kind: "carnet"; id: string } | { kind: "invalide" };
+
+/** Lit le hash de l'URL. Un hash « #carnet/... » dont l'id n'a pas la bonne forme est « invalide ». */
+export function parseCarnetHash(hash: string): CarnetHash {
+  if (!hash.startsWith("#carnet")) return { kind: "aucun" };
+  const id = hash.startsWith("#carnet/") ? hash.slice("#carnet/".length) : "";
+  return STAGIAIRE_ID_PATTERN.test(id) ? { kind: "carnet", id } : { kind: "invalide" };
+}
+
+export function carnetHash(id: string): string {
+  return `#carnet/${id}`;
+}
+
 // ---------- Le fil du stage ----------
 
 /** Paliers d'intensité d'une semaine, en minutes d'activités visées (VALIDEE). */
@@ -132,6 +150,14 @@ export function filDuStage(
 export function formatDay(day: string, options: Intl.DateTimeFormatOptions = { day: "numeric", month: "long", year: "numeric" }): string {
   if (!DAY_PATTERN.test(day)) return day;
   return new Date(`${day}T00:00:00.000Z`).toLocaleDateString("fr-FR", { ...options, timeZone: "UTC" });
+}
+
+/** « 1 juillet → 31 décembre 2026 », ou les deux années si elles diffèrent. */
+export function libellePeriode(startDate: string, endDate: string): string {
+  const debut = isoDay(startDate);
+  const fin = isoDay(endDate);
+  const memeAnnee = debut.slice(0, 4) === fin.slice(0, 4);
+  return `${formatDay(debut, memeAnnee ? { day: "numeric", month: "long" } : undefined)} → ${formatDay(fin)}`;
 }
 
 /** « Aujourd'hui », « Hier », sinon « mer. 1 oct. » (avec l'année si elle diffère). */
