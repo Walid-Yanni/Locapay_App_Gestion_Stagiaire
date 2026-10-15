@@ -22,6 +22,7 @@ import type {
 import { Badge } from "./components/Badge";
 import { DataTable } from "./components/DataTable";
 import { KpiCard } from "./components/KpiCard";
+import { NouveauStagiaireModal } from "./components/NouveauStagiaireModal";
 import { PageHeader, todayLabel } from "./components/PageHeader";
 import { RegistreStats, RegistreTable } from "./components/Registre";
 import { Shell } from "./components/Shell";
@@ -221,23 +222,6 @@ function StagiairesView({
   const [showModal, setShowModal] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
-  const [form, setForm] = useState({
-    firstName: "",
-    lastName: "",
-    email: "",
-    school: "",
-    fieldOfStudy: "",
-    level: "Licence 3",
-    tutorId: stagiaires[0]?.tutorId ?? "",
-    startDate: "2026-06-01T00:00:00.000Z",
-    endDate: "2026-09-30T00:00:00.000Z",
-    typeStage: "PROFESSIONNEL" as "PROFESSIONNEL" | "OBLIGATOIRE" | "INITIATION",
-    subject: "",
-    service: "Ingénierie logicielle",
-  });
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-
   const filtered = stagiaires.filter((s) => {
     const matchesSearch =
       `${s.user?.firstName} ${s.user?.lastName} ${s.school} ${s.subject}`
@@ -247,23 +231,10 @@ function StagiairesView({
     return matchesSearch && matchesStatus;
   });
 
-  async function handleCreate(e: React.FormEvent) {
-    e.preventDefault();
-    setSaving(true);
-    setError("");
-    try {
-      const result = await api<{ temporaryPassword: string }>("/api/stagiaires", {
-        method: "POST",
-        body: JSON.stringify(form),
-      });
-      setShowModal(false);
-      reload();
-      window.alert(`Compte créé. Mot de passe temporaire : ${result.temporaryPassword}\n\nTransmettez-le au stagiaire maintenant : il ne sera plus jamais affiché.`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Erreur création stagiaire");
-    } finally {
-      setSaving(false);
-    }
+  function handleCreated(temporaryPassword: string) {
+    setShowModal(false);
+    reload();
+    window.alert(`Compte créé. Mot de passe temporaire : ${temporaryPassword}\n\nTransmettez-le au stagiaire maintenant : il ne sera plus jamais affiché.`);
   }
 
   return (
@@ -301,110 +272,8 @@ function StagiairesView({
         <RegistreTable stagiaires={filtered} activities={activities} />
       </div>
 
-      {showModal && (
-        <div className="modal-backdrop" onClick={() => setShowModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>Nouveau Stagiaire</h2>
-              <button className="icon-button" onClick={() => setShowModal(false)}>
-                <X size={18} />
-              </button>
-            </div>
-            <form onSubmit={handleCreate} className="form">
-              <div className="form-grid">
-                <label>
-                  Prénom
-                  <input
-                    required
-                    value={form.firstName}
-                    onChange={(e) => setForm({ ...form, firstName: e.target.value })}
-                  />
-                </label>
-                <label>
-                  Nom
-                  <input
-                    required
-                    value={form.lastName}
-                    onChange={(e) => setForm({ ...form, lastName: e.target.value })}
-                  />
-                </label>
-              </div>
-              <label>
-                Email
-                <input
-                  type="email"
-                  required
-                  value={form.email}
-                  onChange={(e) => setForm({ ...form, email: e.target.value })}
-                />
-              </label>
-              <div className="form-grid">
-                <label>
-                  École
-                  <input
-                    required
-                    value={form.school}
-                    onChange={(e) => setForm({ ...form, school: e.target.value })}
-                  />
-                </label>
-                <label>
-                  Filière
-                  <input
-                    required
-                    value={form.fieldOfStudy}
-                    onChange={(e) => setForm({ ...form, fieldOfStudy: e.target.value })}
-                  />
-                </label>
-              </div>
-              <div className="form-grid">
-                <label>
-                  Niveau
-                  <input
-                    required
-                    value={form.level}
-                    onChange={(e) => setForm({ ...form, level: e.target.value })}
-                  />
-                </label>
-                <label>
-                  Type de stage
-                  <select
-                    value={form.typeStage}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        typeStage: e.target.value as "PROFESSIONNEL" | "OBLIGATOIRE" | "INITIATION",
-                      })
-                    }
-                  >
-                    <option value="PROFESSIONNEL">Professionnel</option>
-                    <option value="OBLIGATOIRE">Obligatoire</option>
-                    <option value="INITIATION">Initiation</option>
-                  </select>
-                </label>
-              </div>
-              <label>
-                Sujet de stage
-                <input
-                  required
-                  value={form.subject}
-                  onChange={(e) => setForm({ ...form, subject: e.target.value })}
-                />
-              </label>
-              <label>
-                Service
-                <input
-                  required
-                  value={form.service}
-                  onChange={(e) => setForm({ ...form, service: e.target.value })}
-                />
-              </label>
-              {error && <p className="error">{error}</p>}
-              <button className="primary-button" type="submit" disabled={saving}>
-                {saving ? "Création en cours..." : "Créer le compte stagiaire"}
-              </button>
-            </form>
-          </div>
-        </div>
+      {canCreate && showModal && (
+        <NouveauStagiaireModal onClose={() => setShowModal(false)} onCreated={handleCreated} />
       )}
     </section>
     </>

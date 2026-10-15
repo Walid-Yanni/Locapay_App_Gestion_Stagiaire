@@ -1,0 +1,41 @@
+/* apps/web/src/components/NouveauStagiaireModal.css
+   Styles limités à .nouveau-stagiaire : rien ne fuit sur les autres écrans. Couleurs : tokens --lp-*. */
+
+.nouveau-stagiaire {
+  --ns-error: #9b1c1c;
+  font-family: var(--lp-font);
+  color: var(--lp-ink);
+}
+.nouveau-stagiaire h2 { margin: 0; font-family: var(--lp-font); font-weight: 600; font-size: 22px; }
+
+.nouveau-stagiaire__form { margin: 0; }
+.nouveau-stagiaire__form label { font-weight: 500; font-size: 14px; }
+.nouveau-stagiaire__form input,
+.nouveau-stagiaire__form select { font-weight: 400; border-color: var(--lp-line); }
+.nouveau-stagiaire__form input:focus-visible,
+.nouveau-stagiaire__form select:focus-visible { outline: 2px solid var(--lp-green); outline-offset: 1px; }
+.nouveau-stagiaire__form [aria-invalid="true"] { border-color: var(--ns-error); }
+.nouveau-stagiaire__form select:disabled { color: var(--lp-muted); background: var(--lp-page); }
+
+.nouveau-stagiaire__field-error { color: var(--ns-error); font-size: 13px; font-weight: 400; }
+
+.nouveau-stagiaire__form-error {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--ns-error);
+  border-radius: 6px;
+  color: var(--ns-error);
+  font-size: 14px;
+}
+
+.nouveau-stagiaire__hint {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px dashed var(--lp-line);
+  border-radius: 6px;
+  background: var(--lp-green-pale);
+  color: var(--lp-muted);
+  font-size: 13px;
+}
+
+.nouveau-stagiaire .primary-button:disabled { opacity: 0.55; cursor: not-allowed; }
