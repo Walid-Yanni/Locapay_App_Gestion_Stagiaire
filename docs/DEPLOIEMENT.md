@@ -39,7 +39,11 @@ dc exec -e NODE_PATH=/app/apps/api/node_modules api ./node_modules/.bin/tsx ../.
 # Simulation d'abord ; si tout est correct, ajouter --confirmer.
 ```
 Le mot de passe temporaire s'affiche une seule fois : le transmettre en main propre. Il doit être changé à la première connexion.
-Ensuite, les autres comptes se créent depuis l'application (écran Stagiaires).
+Les tuteurs et responsables RH se créent avec le même script (l'application ne crée que des stagiaires) :
+```bash
+dc exec -e NODE_PATH=/app/apps/api/node_modules api ./node_modules/.bin/tsx ../../scripts/creer-admin-initial.ts --email tuteur@exemple.bj --prenom Prénom --nom Nom --role TUTEUR --confirmer
+```
+Les stagiaires se créent ensuite depuis l'application (écran Registre, il faut au moins un tuteur actif).
 
 ## 5. Reverse proxy du VPS (exemple nginx, TLS)
 ```nginx
