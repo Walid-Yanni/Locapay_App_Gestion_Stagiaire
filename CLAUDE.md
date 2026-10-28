@@ -196,15 +196,15 @@ formulaire de création de stagiaire et dialogue du mot de passe temporaire. Mob
 1. **Carnet de stage** : fiche stagiaire en double page (DESIGN.md §5).
 2. **Suivi du jour** avec cachet à maintenir (`StampButton`, appui long pour viser, branché sur
    `PATCH /api/activities/:id/review`).
-3. **[Sécurité] Limitation des tentatives de connexion** (`express-rate-limit`), **obligatoire avant la mise en ligne**.
+3. **[FAIT le 28 oct., `lib/attempt-limiter.ts`, sans dépendance] [Sécurité] Limitation des tentatives de connexion** (`express-rate-limit`), **obligatoire avant la mise en ligne**.
 4. Libellé de la barre latérale selon le rôle (« CARNET RH » ou « CARNET DE STAGE »).
 5. Décisions produit en attente : champ « Lieu », absent du modèle (DESIGN.md §8) ; qui saisit les activités
    dans Suivi du jour ; grille d'évaluation (§6).
-6. Tests automatisés.
+6. Tests automatisés **[PARTIEL : `pnpm test`, 15 tests de logique pure dans `tests/` (limiteur, mot de passe temporaire, Carnet) ; reste les routes et services de l'API contre une base de test]**.
 7. Comptes gmail de test (protégés dans `nettoyer-comptes-test.ts`) à trier.
 8. Modal de création : un clic sur le fond ferme et perd la saisie (à durcir).
-9. Secrets et comptes du seed (mot de passe commun) à remplacer avant la production.
-10. Fixer le fuseau du job de fin de cycle (timezone Africa/Porto-Novo dans la planification) avant la production :
+9. Secrets et comptes du seed (mot de passe commun) à remplacer avant la production **[PARTIEL : le seed refuse toute base non locale ; premiers comptes via `scripts/creer-admin-initial.ts` ; secrets : `.env.production`, voir `docs/DEPLOIEMENT.md`]**.
+10. **[FAIT le 28 oct.]** Fixer le fuseau du job de fin de cycle (timezone Africa/Porto-Novo dans la planification) avant la production :
     sur un serveur en UTC, 02:00 UTC = 03:00 au Bénin.
 
 Plus tard : versions mobile des écrans
