@@ -81,6 +81,6 @@ docker compose --env-file .env.production -f docker-compose.prod.yml up -d --bui
 ## Vérifications après déploiement
 - Connexion avec le compte administrateur, changement du mot de passe temporaire.
 - `https://…/api/docs` doit répondre 404 (documentation fermée en production).
-- Cinq mauvaises connexions successives sur une adresse e-mail : la neuvième tentative reçoit une réponse 429.
+- Huit mauvaises connexions successives sur une même adresse e-mail : la neuvième tentative reçoit une réponse 429.
 - Génération d'un PDF de rapport (Chromium).
 - Journal du conteneur API : `docker compose … logs api` (le job de fin de cycle tourne à 02:00 heure du Bénin).
