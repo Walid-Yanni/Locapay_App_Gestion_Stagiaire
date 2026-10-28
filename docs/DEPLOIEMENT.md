@@ -34,8 +34,8 @@ Les migrations sont appliquées automatiquement au démarrage de l'API (`prisma 
 
 ## 4. Créer le premier compte administrateur RH
 ```bash
-C="docker compose --env-file .env.production -f docker-compose.prod.yml exec -e NODE_PATH=/app/apps/api/node_modules api"
-$C ./node_modules/.bin/tsx ../../scripts/creer-admin-initial.ts --email rh@exemple.bj --prenom Prénom --nom Nom
+dc() { docker compose --env-file .env.production -f docker-compose.prod.yml "$@"; }   # bash et zsh
+dc exec -e NODE_PATH=/app/apps/api/node_modules api ./node_modules/.bin/tsx ../../scripts/creer-admin-initial.ts --email rh@exemple.bj --prenom Prénom --nom Nom
 # Simulation d'abord ; si tout est correct, ajouter --confirmer.
 ```
 Le mot de passe temporaire s'affiche une seule fois : le transmettre en main propre. Il doit être changé à la première connexion.
