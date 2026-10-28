@@ -2,9 +2,11 @@
 // « Carnet de stage » : fiche d'un stagiaire en double page (DESIGN.md §5).
 // Les droits sont imposés par l'API : hors de sa portée, GET /api/stagiaires/:id répond 404.
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import type { Report, UserRole } from "@locapay/shared-types";
 import { api, ApiError } from "../lib/api";
 import {
   CATEGORY_LABELS,
+  etatSignature,
   filDuStage,
   INTENSITE_LABELS,
   isoDay,
@@ -13,6 +15,7 @@ import {
   libelleJour,
   libellePeriode,
   libelleSemaine,
+  REPORT_TYPE_LABELS,
   type Intensite,
   type SemaineFil,
   type StagiaireDetail,
@@ -58,10 +61,15 @@ export function CarnetView({
   stagiaireId,
   onBack,
   backLabel,
+  role,
+  onSigned,
 }: {
   stagiaireId: string;
   onBack: () => void;
   backLabel: string;
+  role: UserRole;
+  /** Appelé après une signature réussie, pour rafraîchir les listes de l'application. */
+  onSigned: () => void;
 }) {
   const { etat, recharger } = useCarnet(stagiaireId);
   const service = etat.kind === "pret" ? etat.stagiaire.service : "";
@@ -98,12 +106,14 @@ export function CarnetView({
         </div>
       )}
 
-      {etat.kind === "pret" && <CarnetPages stagiaire={etat.stagiaire} />}
+      {etat.kind === "pret" && (
+        <CarnetPages stagiaire={etat.stagiaire} role={role} onSigned={() => { recharger(); onSigned(); }} />
+      )}
     </div>
   );
 }
 
-function CarnetPages({ stagiaire: s }: { stagiaire: StagiaireDetail }) {
+function CarnetPages({ stagiaire: s, role, onSigned }: { stagiaire: StagiaireDetail; role: UserRole; onSigned: () => void }) {
   const fullName = `${s.user?.firstName ?? ""} ${s.user?.lastName ?? ""}`.trim() || "Sans nom";
   const cursus = [s.school, s.level, s.fieldOfStudy].filter(Boolean).join(" · ");
   const tuteur = s.tutor ? `${s.tutor.firstName} ${s.tutor.lastName}` : "Non renseigné";
@@ -144,6 +154,7 @@ function CarnetPages({ stagiaire: s }: { stagiaire: StagiaireDetail }) {
 
         <FilDuStageEncadre stagiaire={s} />
         <Competences skills={s.skills} />
+        <SignatureRapport reports={s.reports} role={role} onSigned={onSigned} />
       </section>
 
       <section className="carnet-page carnet-page--droite" aria-labelledby="carnet-journal-titre">
@@ -322,5 +333,72 @@ function Journal({ activities }: { activities: StagiaireDetail["activities"] }) 
         </button>
       )}
     </>
+  );
+}
+
+/**
+ * Signature du rapport en attente pour le rôle connecté. Irréversible : aucune route ne retire une
+ * signature. Un premier clic ne signe donc jamais ; il ouvre une confirmation explicite.
+ */
+function SignatureRapport({ reports, role, onSigned }: { reports: Report[]; role: UserRole; onSigned: () => void }) {
+  const [confirmation, setConfirmation] = useState(false);
+  const [envoi, setEnvoi] = useState(false);
+  const [erreur, setErreur] = useState<string | null>(null);
+  const etat = etatSignature(reports, role);
+
+  if (etat.kind === "aucun") return null;
+  if (etat.kind === "deja_signe") {
+    return (
+      <section className="carnet-signature" aria-labelledby="carnet-signature-titre">
+        <h3 id="carnet-signature-titre" className="carnet-sous-titre">Signature</h3>
+        <p className="carnet-muted">Vous avez signé. Le rapport attend les autres signatures.</p>
+      </section>
+    );
+  }
+
+  const libelle = `rapport ${REPORT_TYPE_LABELS[etat.report.type]}`;
+
+  async function signer() {
+    if (etat.kind !== "a_signer") return;
+    setEnvoi(true);
+    setErreur(null);
+    try {
+      await api(`/api/reports/${encodeURIComponent(etat.report.id)}/sign`, { method: "PATCH" });
+      setConfirmation(false);
+      onSigned();
+    } catch (err) {
+      setErreur(err instanceof ApiError ? err.message : "Impossible de joindre le serveur. Réessayez.");
+    } finally {
+      setEnvoi(false);
+    }
+  }
+
+  return (
+    <section className="carnet-signature" aria-labelledby="carnet-signature-titre">
+      <h3 id="carnet-signature-titre" className="carnet-sous-titre">Signature</h3>
+      {!confirmation ? (
+        <>
+          <p className="carnet-muted">Un {libelle} attend votre signature.</p>
+          <button type="button" className="pill-button" onClick={() => setConfirmation(true)}>
+            Signer le {libelle}
+          </button>
+        </>
+      ) : (
+        <div className="carnet-signature__confirm" role="alertdialog" aria-labelledby="carnet-signature-question">
+          <p id="carnet-signature-question" className="carnet-signature__question">
+            Signer le {libelle} ? Cette signature est définitive : elle ne pourra pas être retirée.
+          </p>
+          {erreur && <p className="carnet-signature__erreur" role="alert">{erreur}</p>}
+          <div className="carnet-signature__actions">
+            <button type="button" className="pill-button" onClick={signer} disabled={envoi} autoFocus>
+              {envoi ? "Signature…" : "Confirmer la signature"}
+            </button>
+            <button type="button" className="carnet-signature__annuler" onClick={() => { setConfirmation(false); setErreur(null); }} disabled={envoi}>
+              Annuler
+            </button>
+          </div>
+        </div>
+      )}
+    </section>
   );
 }

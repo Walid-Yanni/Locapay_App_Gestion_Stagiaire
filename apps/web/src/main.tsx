@@ -991,6 +991,8 @@ function Workspace({ session, onLogout }: { session: Session; onLogout: () => vo
               stagiaireId={carnetId}
               onBack={() => navigate(homeView)}
               backLabel={homeView === "stagiaires" ? "Retour au registre" : "Retour au tableau de bord"}
+              role={role}
+              onSigned={() => reports.reload()}
             />
           )}
           {view === "activities" && (
