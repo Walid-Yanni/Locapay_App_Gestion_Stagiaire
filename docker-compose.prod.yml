@@ -1,0 +1,50 @@
+# Production : docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
+# Voir docs/DEPLOIEMENT.md. Ne pas confondre avec docker-compose.yml (développement local).
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: locapay
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD est obligatoire}
+      POSTGRES_DB: locapay_stagiaires
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U locapay -d locapay_stagiaires"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    # Aucun port publié : la base n'est joignable que par l'API, sur le réseau interne.
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: "4000"
+      DATABASE_URL: postgresql://locapay:${POSTGRES_PASSWORD}@db:5432/locapay_stagiaires
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET est obligatoire}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET est obligatoire}
+      WEB_ORIGIN: ${WEB_ORIGIN:?WEB_ORIGIN est obligatoire}
+      TRUST_PROXY: ${TRUST_PROXY:-1}
+    # Aucun port publié : seul le conteneur « web » (nginx) y accède.
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      # Écoute sur la machine uniquement : le reverse proxy du VPS (TLS) pointe ici.
+      - "127.0.0.1:${WEB_PORT:-8080}:80"
+
+volumes:
+  db_data:
