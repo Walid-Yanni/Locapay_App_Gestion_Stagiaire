@@ -1,9 +1,12 @@
 import bcrypt from "bcrypt";
 import { PrismaClient } from "@prisma/client";
+import { verifierBaseLocale } from "../scripts/base-locale.js";
 
 const prisma = new PrismaClient();
 
 async function main() {
+  // Le seed VIDE toute la base puis crée des comptes au mot de passe commun : jamais hors base locale.
+  verifierBaseLocale();
   await prisma.notification.deleteMany();
   await prisma.report.deleteMany();
   await prisma.evaluation.deleteMany();

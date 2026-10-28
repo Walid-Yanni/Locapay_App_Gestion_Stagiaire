@@ -8,3 +8,5 @@ build/
 .expo/
 *.log
 .DS_Store
+.env.production
+.env.*.local
