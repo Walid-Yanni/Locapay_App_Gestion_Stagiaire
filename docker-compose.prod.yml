@@ -1,5 +1,9 @@
 # Production : docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
 # Voir docs/DEPLOIEMENT.md. Ne pas confondre avec docker-compose.yml (développement local).
+# Nom de projet dédié : sans lui, Compose réutiliserait celui du développement (même dossier) et
+# s'attacherait au volume de la base locale. Les volumes de production sont préfixés « locapay-prod_ ».
+name: locapay-prod
+
 services:
   db:
     image: postgres:16
